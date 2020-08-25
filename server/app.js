@@ -52,7 +52,13 @@ function broadcastSession(session) {
 			type: 'session-broadcast',
 			peers: {
 				you: client.id,
-				clients: clients.map(client => client.id)
+				clients: clients.map(client => {
+					return {
+						//name: client.name,	//TODO implement usernames
+						id: client.id,
+						state: client.state
+					};
+				}),
 			}
 		});
 	});
@@ -72,12 +78,10 @@ server.on('connection', conn => {
 		const data = JSON.parse(msg);
 
 		if (data.type === 'create-session') {
-			//A few problems with basics sessions
-			//const id = createId();	//Create unique id
-			//const session = new Session(id);
 			const session = createSession();
 			session.join(client);
 
+			//Set initial state of client
 			client.state = data.state;
 			//sessions.set(session.id, session);
 			client.send({
@@ -88,9 +92,15 @@ server.on('connection', conn => {
 		else if (data.type === 'join-session') {
 			const session = getSession(data.id) || createSession(data.id);
 			session.join(client);	//You need to make sure the session is alive
+
+			client.state = data.state;
 			broadcastSession(session);
 		}
 		else if (data.type === 'state-update') {
+			const [prop, value] = data.state;
+
+			//Update state of peer view
+			client.state[data.fragment][prop] = value;
 			client.broadcast(data);
 		}
 	/*	if (logSessions) {

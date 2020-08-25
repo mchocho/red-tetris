@@ -96,15 +96,18 @@ function connectionManager(gameManager) {
 	
 	function initSession() {
 		const sessionId = window.location.hash.split('#')[1];	//Everything after the hash
+		const state = localTetris.serialize(localTetris);
 		if (sessionId) {
 			sendMessage({
 				type: 'join-session',
-				id: sessionId
+				id: sessionId,
+				state
 			})
 		}
 		else {
 			sendMessage({
-				type: 'create-session'
+				type: 'create-session',
+				state
 			});
 			//connection.send('create-session');
 		}
@@ -136,18 +139,21 @@ function connectionManager(gameManager) {
 	
 	function updateManager(peersList) {
 		const me = peersList.you;
-		const clients = peersList.clients.filter(id => me !== id);
+		const clients = peersList.clients.filter(client => me !== client.id);
 
-		clients.forEach(id => {
-			if (!peers.has(id)) {
+		clients.forEach(client => {
+			if (!peers.has(client.id)) {
 				//Adds new player to the game view
 				const player = gameManager.createPlayer();
-				peers.set(id, player);
+
+				player.unserialize(client.state)
+				peers.set(client.id, player);
 			}
 		});
 
 		[...peers.entries()].forEach(([id, player]) => {
-			if (clients.indexOf(id) === -1) {
+			//Client id is not in payload
+			if (!clients.some(client => client.id === id)) { 
 				gameManager.removePlayer(player);  //Remove player from view
 				peers.delete(id);	//Remove player from room
 			}
@@ -167,6 +173,7 @@ function connectionManager(gameManager) {
 			game.updatePanel();
 		}
 		else {
+			console.log('YOU SHOULD BE DRAWING!');
 			game.draw(game);
 		}
 	}
@@ -327,7 +334,7 @@ function Game(element) {
 	}
 	const canvas = element.querySelector('canvas');
 	const context = canvas.getContext('2d');
-	const arena = Arena(13, 20);
+	let arena = Arena(13, 20);
 	const colours = [
 		null,
 		'red',
@@ -371,7 +378,7 @@ function Game(element) {
 			element.querySelector('.pieces').textContent = `Pieces: ${game.player.getPieceCount()}`;
 		}
 	};
-	const player = Player(game);
+	let player = Player(game);
 	let lastTime = 0;
 
 	function update(time = 0) {
@@ -389,6 +396,26 @@ function Game(element) {
 	player.reset(player);
 	//update();
 	game.player = player;	//Maybe an array
+
+	game.serialize = function(game) {
+		return {
+			arena: {
+				matrix: game.arena.matrix
+			},
+			player: {
+				matrix: game.player.matrix,
+				pos: game.player.pos,
+				score: game.player.score
+			}
+		};
+	};
+
+	game.unserialize = function(state) {
+		arena = Object.assign(state.arena);
+		player = Object.assign(state.player);
+		game.updatePanel();
+		game.draw(game);
+	}
 	
 	player.addListener('score', score => {
 		game.updatePanel();
@@ -397,7 +424,7 @@ function Game(element) {
 	return game;
 }
 
-function GameManager() {
+function GameManager(mode='multiplayer') {
 	const instances = new Set; //Arrays are not optimal and may hold duplicates
 	const template = document.getElementById('player-template');
 
@@ -611,7 +638,7 @@ function Player(game) {
 
 
 //Main
-const dev = false;
+const dev = true;
 const logEvents = true;
 const collisionStatus = false;
 const gameManager = GameManager();
