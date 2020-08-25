@@ -1,13 +1,9 @@
-const dev = true;
-const collisionStatus = false;
-let gameActive = false;
-
-
 function Arena(w, h) {
 	if (dev) {
 		console.log('Creating matrix');
 	}
 	const matrix = [];
+	const events = Events();
 	
 	while (h--) {
 		matrix.push(new Array(w).fill(0));
@@ -19,9 +15,12 @@ function Arena(w, h) {
 	
 	return {
 		matrix,
-
+		addListener(name, callback) {
+			events.listen(name, callback);
+		},
 		clear(arena) {
 			arena.matrix.forEach(row => row.fill(0)); //Remove everything from the arena
+			events.emit('matrix', matrix);
 		},
 
 		collide(arena, player) {
@@ -56,28 +55,30 @@ function Arena(w, h) {
 					}
 				});
 			});
+			events.emit('matrix', matrix);
 		},
 
-		sweep(arena, player) {
+		sweep(/*arena, */player) {
 			//Collects the game rows
 			let rowCount = 1;
 
 			outer:
-			for (let y = arena.length - 1; y > 0; --y) { //Started from the bottom
-				for (let x = 0; x < arena[y].length; ++x) {
+			for (let y = /*arena.*/matrix.length - 1; y > 0; --y) { //Started from the bottom
+				for (let x = 0; x < /*arena*/matrix[y].length; ++x) {
 					//Check if any rows have a 0; meaning it's not fully populated
-					if (arena[y][x] === 0) {
+					if (/*arena*/matrix[y][x] === 0) {
 						continue outer;	//Continue on next row
 						//labels: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/label
 					}
 				}
 
 				//Perfect row. remove row from arena
-				const row = arena.splice(y, 1)[0].fill(0); //After remove, copy and zero fill
-				arena.unshift(row);	//Throw row ontop of arena 
+				const row = /*arena*/matrix.splice(y, 1)[0].fill(0); //After remove, copy and zero fill
+				/*arena*/matrix.unshift(row);	//Throw row ontop of arena 
 				++y;			//Offset y position
 				player.score += rowCount * 10;
 				rowCount *= 2;		//For every row doublw score
+				events.emit('matrix', matrix);
 
 				if (dev) {
 					console.log('Swept a row. Nice!');
@@ -88,22 +89,150 @@ function Arena(w, h) {
 	};
 }
 
-function connectionManager() {
+function connectionManager(gameManager) {
 	let connection = null;
+	const peers = new Map;
+	const localTetris = [...gameManager.instances][0];
+	
+	function initSession() {
+		const sessionId = window.location.hash.split('#')[1];	//Everything after the hash
+		if (sessionId) {
+			sendMessage({
+				type: 'join-session',
+				id: sessionId
+			})
+		}
+		else {
+			sendMessage({
+				type: 'create-session'
+			});
+			//connection.send('create-session');
+		}
+	}
+
+	function receive(msg) {
+		const data = JSON.parse(msg);
+
+		if (data.type === 'session-created') {
+			window.location.hash = data.id;
+		}
+		else if (data.type === 'session-broadcast') {
+			updateManager(data.peers);
+		}
+		else if (data.type === 'state-update') {
+			console.log('Received content: ', data);
+			updatePeer(data.clientId, data.fragment, data.state);
+		}
+	}
+
+	function sendMessage(data) {
+		const msg = JSON.stringify(data);
+
+		if (dev) {
+			console.log(`Sending message ${msg}`);
+		}
+		connection.send(msg);
+	}
+	
+	function updateManager(peersList) {
+		const me = peersList.you;
+		const clients = peersList.clients.filter(id => me !== id);
+
+		clients.forEach(id => {
+			if (!peers.has(id)) {
+				//Adds new player to the game view
+				const player = gameManager.createPlayer();
+				peers.set(id, player);
+			}
+		});
+
+		[...peers.entries()].forEach(([id, player]) => {
+			if (clients.indexOf(id) === -1) {
+				gameManager.removePlayer(player);  //Remove player from view
+				peers.delete(id);	//Remove player from room
+			}
+		});
+	}
+
+	function updatePeer(id, fragment, [prop, value]) {
+		if (!peers.has(id)) {
+			console.error('Client does not exit', id);
+			return;
+		}
+		const game = peers.get(id);
+
+		game[fragment][prop] = value;
+
+		if (prop === 'score') {
+			game.updatePanel();
+		}
+		else {
+			game.draw(game);
+		}
+	}
+
+	function watchEvents() {
+		const player = localTetris.player;
+		const arena = localTetris.arena;
+
+		['pos', 'matrix', 'score'].forEach(prop => {
+			player.addListener(prop, value => {
+				sendMessage({
+					type: 'state-update',
+					fragment: 'player',
+					state: [prop, value]
+				});
+			});
+		});
+
+		['matrix'].forEach(prop => {
+			arena.addListener(prop, value => {
+				sendMessage({
+					type: 'state-update',
+					fragment: 'arena',
+					state: [prop, value]
+				});
+			});
+		});
+
+
+	/*	player.addListener('pos', pos => {
+			if (logEvents) {
+				console.log('Player pos changed', pos);
+			}
+		});
+
+		player.addListener('matrix', matrix => {
+			if (logEvents) {
+				console.log('Player matrix changed', matrix);
+			}
+		});*/
+
+	}
 
 	return {
 		connect(address) {
 			connection = new WebSocket(address);
 
+			//Add connection listener
 			connection.addEventListener('open', () => {
 				if (dev) {
 					console.log('Connection established');
 				}
-				connection.send('create-session');
+				initSession();
+				watchEvents();
 			});
-		},
-		sendMessage(message) {
-			connection.send(message);
+
+			//Add message received listener
+			connection.addEventListener('message', event => {
+				if (dev) {
+					console.log('Received message', event.data);
+				}
+				receive(event.data);
+			});
+		},		
+		send(data) {
+			sendMessage(data);
 		}
 	};
 }
@@ -163,6 +292,33 @@ function createPiece(type) {
 	}
 }
 
+function Events() {
+	const listeners = new Set;
+
+	return {
+		listen(name, callback) {
+			if (logEvents) {
+				console.log('Event triggered: ', name);
+			}
+
+			listeners.add({
+				name,
+				callback
+			});
+		},
+		emit(name, ...data) {
+			if (logEvents) {
+				console.log('Emitting event: ', name);
+			}
+
+			listeners.forEach(listener => {
+				if (listener.name === name) {
+					listener.callback(...data);
+				}
+			});
+		}
+	};
+}
 
 
 function Game(element) {
@@ -183,6 +339,7 @@ function Game(element) {
 		'pink'
 	];
 	const game = {
+		element,
 		canvas,
 		context,
 		arena,
@@ -206,8 +363,8 @@ function Game(element) {
 				});
 			});
 		},
-		getElement() {
-			return element;
+		run() {
+			update();
 		},
 		updatePanel() {
 			element.querySelector('.score').textContent = `Score: ${game.player.score}`;
@@ -230,10 +387,13 @@ function Game(element) {
 
 	context.scale(18, 20);
 	player.reset(player);
-	update();
+	//update();
 	game.player = player;	//Maybe an array
-	game.updatePanel();
-
+	
+	player.addListener('score', score => {
+		game.updatePanel();
+	});
+	
 	return game;
 }
 
@@ -262,9 +422,9 @@ function GameManager() {
 
 			return tetris;
 		},
-		removePlayer(game) {
-			this.instances.delete(game);
-			document.body.removeChild(game.getElement());
+		removePlayer(player) {
+			this.instances.delete(player);
+			document.body.removeChild(player.element);
 		}
 	};
 }
@@ -276,6 +436,8 @@ function Player(game) {
 
 	const pos = {x: 0, y: 0};
 	const arena = game.arena;
+	
+	const events = Events(); 
 	
 	let pieceCount = 0;
 	let dropCounter = 0;	
@@ -289,18 +451,24 @@ function Player(game) {
 		DROP_FAST: 50,
 		dropInterval: 1000, //Every 1 second we want to drop a piece
 		score: 0,
+		addListener(name, callback) {
+			events.listen(name, callback);
+		},
 		drop(player) {
 			pos.y++;
+			dropCounter = 0;
 			if (arena.collide(arena, player)) {
 				pos.y--;
 				arena.merge(arena.matrix, player);
 				player.reset(player);
 				arena.sweep(arena.matrix, player);
-				game.updatePanel();
+				events.emit('score', player.score);
+				//game.updatePanel(); //Shows score and pieces count
 				//player.pos.y = 0;
 				//update player's game state on server
+				return;
 			}
-			dropCounter = 0;
+			events.emit('pos', pos);
 		},
 
 		dropPieceInPile(player) {
@@ -323,6 +491,7 @@ function Player(game) {
 				pos[axis] -= dir;
 				return false;
 			}
+			events.emit('pos', pos);
 			return true;
 		},
 
@@ -340,8 +509,11 @@ function Player(game) {
 				arena.matrix.forEach(row => row.fill(0)); //Remove everything from the arena
 				player.score = 0; //Maybe on new game
 				pieceCount = 0; //Maybe on new game
-				game.updatePanel();
+				events.emit('score', player.score);
+				//game.updatePanel();
 			}
+			events.emit('pos', pos);
+			events.emit('matrix', player.matrix);
 		},
 
 		rotate(player, dir) {
@@ -358,6 +530,7 @@ function Player(game) {
 					return;
 				}
 			}
+			events.emit('matrix', player.matrix);
 		},
 
 		_rotateMatrix(matrix, dir) {
@@ -438,15 +611,22 @@ function Player(game) {
 
 
 //Main
-
-//Create socket connection
-const connection = connectionManager();
-connection.connect('ws://localhost:9000');
-
-
-
+const dev = false;
+const logEvents = true;
+const collisionStatus = false;
 const gameManager = GameManager();
 const localTetris = gameManager.createPlayer();
+
+//Create socket connection
+const connection = connectionManager(gameManager);
+connection.connect('ws://localhost:9000');
+
+let gameActive = false;
+
+
+localTetris.element.classList.add('local');
+localTetris.run();
+
  
 //Run in console to manipulate tetromino
 //localTetris.player.rotate(tetri[0].player, -1)

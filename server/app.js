@@ -1,49 +1,20 @@
 require('dotenv').config({path: './.env'});
 
 const WebSocketServer = require('ws').Server;
+const Session = require('./session');
+const Client = require('./client');
+
 const port = process.env.PORT || 9000;
 
 const server = new WebSocketServer({port}, () => {
 	console.log('Socket listening on port ', port);
 });
 const dev = process.env.DEV || false; 
+const logSessions = process.env.SESSION || false;
 
 const sessions = new Map();
 
-class Session {
-	constructor(id)
-	{
-		this.id = id;
-		this.clients = new Set;
-	}
-	join(client)
-	{
-		//Connects client to a session
-		if (client.session) {
-			throw new Error('Client already in session');
-		}
-		this.clients.add(client);
-		client.session = this;
-	}
-	leave(client)
-	{
-		//
-		if (client.session !== this) {
-			throw new Error('Client not in session');
-		}
-		this.clients.delete(client);
-		client.session = null;
-	}
-}
-
-class Client {
-	constructor(conn) {
-		this.conn = conn;	//Store the clients connection
-		this.session = null;	//Session the client will live in
-	}
-}
-
-function createId(len = 6, chars = 'abcdefghjkmnopqrstwxyz0123456789') {
+function createId(len=6, chars='abcdefghjkmnopqrstwxyz0123456789') {
 	let id = '';
 	while (len--) {
 		id += chars[Math.random() * chars.length | 0];
@@ -51,28 +22,80 @@ function createId(len = 6, chars = 'abcdefghjkmnopqrstwxyz0123456789') {
 	return id;
 } 
 
+function createClient(conn, id=createId()) {
+	return new Client(conn, id);
+}
+
+function createSession(id=createId()) {
+	if (sessions.has(id)) {
+		throw new Error(`Session ${id} already exists`);
+	}
+
+	const session = new Session(id);
+	if (dev) {
+		console.log('Creating session', session);
+	}
+	sessions.set(id, session);
+
+	return session;
+}
+
+function getSession(id) {
+	return sessions.get(id);
+}
+
+function broadcastSession(session) {
+	const clients = [...session.clients];
+
+	clients.forEach(client => {
+		client.send({
+			type: 'session-broadcast',
+			peers: {
+				you: client.id,
+				clients: clients.map(client => client.id)
+			}
+		});
+	});
+}
+
 server.on('connection', conn => {
 	if (dev) {
 		console.log('Connection established');
 	}
-	const client = new Client(conn);
+	const client = createClient(conn);
 
 
 	conn.on('message', msg => {
 		if (dev) {
 			console.log('Message receieved', msg);
 		}
+		const data = JSON.parse(msg);
 
-		if (msg === 'create-session') {
+		if (data.type === 'create-session') {
 			//A few problems with basics sessions
-			const id = createId();	//Create unique id
-			const session = new Session(id);
+			//const id = createId();	//Create unique id
+			//const session = new Session(id);
+			const session = createSession();
 			session.join(client);
-			sessions.set(session.id, session);
-			if (dev) {
-				console.log(sessions);
-			}
+
+			client.state = data.state;
+			//sessions.set(session.id, session);
+			client.send({
+				type: 'session-created',
+				id: session.id
+			});	//Send the room id	
 		}
+		else if (data.type === 'join-session') {
+			const session = getSession(data.id) || createSession(data.id);
+			session.join(client);	//You need to make sure the session is alive
+			broadcastSession(session);
+		}
+		else if (data.type === 'state-update') {
+			client.broadcast(data);
+		}
+	/*	if (logSessions) {
+			console.log('Sessions ', sessions);
+		}*/
 	});
 
 
@@ -85,6 +108,7 @@ server.on('connection', conn => {
 
 		if (session) {
 			session.leave(client);
+			broadcastSession(session);
 
 			if (session.clients.size === 0) {
 				if (dev) {
