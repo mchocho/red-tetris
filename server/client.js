@@ -3,9 +3,11 @@
 const DEV = process.env.DEV;
 
 class Client {
-        constructor(conn, id) {
+        constructor(conn, id, name) {
                 this.conn = conn;       //Store the clients connection
                 this.id = id;
+		this.name = name;
+		this.score = 0;
                 this.session = null;    //Session the client will live in
 		this.state = null;
         }

@@ -1,13 +1,14 @@
 require('dotenv').config({path: './.env'});
 
 const WebSocketServer = require('ws').Server;
+const isString = require('lodash.isstring');
 const Session = require('./session');
 const Client = require('./client');
 
-const port = process.env.PORT || 9000;
+const PORT = process.env.PORT || 9000;
 
-const server = new WebSocketServer({port}, () => {
-	console.log('Socket listening on port ', port);
+const server = new WebSocketServer({port: PORT}, () => {
+	console.log('Socket listening on port ', PORT);
 });
 const dev = process.env.DEV || false; 
 const logSessions = process.env.SESSION || false;
@@ -22,7 +23,7 @@ function createId(len=6, chars='abcdefghjkmnopqrstwxyz0123456789') {
 	return id;
 } 
 
-function createClient(conn, id=createId()) {
+function createClient(conn, id=createId(), name) {
 	return new Client(conn, id);
 }
 
@@ -40,6 +41,15 @@ function createSession(id=createId()) {
 	return session;
 }
 
+function createUsername(name) {
+	if (isString(name)) {
+		if (name.trim() > 3) {
+			return name;
+		}
+	}
+	return `user-${createId()}`;
+}
+
 function getSession(id) {
 	return sessions.get(id);
 }
@@ -54,8 +64,9 @@ function broadcastSession(session) {
 				you: client.id,
 				clients: clients.map(client => {
 					return {
-						//name: client.name,	//TODO implement usernames
 						id: client.id,
+						name: client.name,
+						score: client.score,
 						state: client.state
 					};
 				}),
@@ -68,7 +79,7 @@ server.on('connection', conn => {
 	if (dev) {
 		console.log('Connection established');
 	}
-	const client = createClient(conn);
+	const client = createClient(conn, createId);
 
 
 	conn.on('message', msg => {
@@ -78,7 +89,9 @@ server.on('connection', conn => {
 		const data = JSON.parse(msg);
 
 		if (data.type === 'create-session') {
-			const session = createSession();
+			const session = createSession(createId(), client.id);
+
+			client.name = createName(data.name);
 			session.join(client);
 
 			//Set initial state of client
@@ -90,11 +103,36 @@ server.on('connection', conn => {
 			});	//Send the room id	
 		}
 		else if (data.type === 'join-session') {
-			const session = getSession(data.id) || createSession(data.id);
+			const session = getSession(data.id) || createSession(data.id, client.id);
+			
+			client.name = createName(data.name);
 			session.join(client);	//You need to make sure the session is alive
 
 			client.state = data.state;
 			broadcastSession(session);
+		}
+		else if (data.type === 'start-game') {
+			if (!sessions.has(data.id)) {
+				throw new Error(`Session does not exist`);
+			}
+			const session = getSession(data.id);
+			const clients = [...session.clients];
+
+			if (session.owner !== client.id) {
+				client.send({
+					type: 'multiplayer-error',
+					message: `Waiting for the room owner`
+				});
+				return;
+
+			if (session.size() <= 1) {
+				return;
+
+			clients.forEach(client => {
+				client.send({
+					type: 'start_game',
+				});
+			});
 		}
 		else if (data.type === 'state-update') {
 			const [prop, value] = data.state;
@@ -126,6 +164,10 @@ server.on('connection', conn => {
 				}
 				//No one is in this session, we can delete the session
 				sessions.delete(session.id);
+			}
+			else if (session.owner === client.id) {
+				//The client who left is in charge of the session
+				session.getNewOwner();
 			}
 		}
 	});

@@ -1,14 +1,68 @@
 <html>
 <head>
 	<title>Tetris</title>
+	<link href="https://unpkg.com/nes.css@latest/css/nes.min.css" rel="stylesheet" />
+	<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 	<style>
 		body {
 			display: flex;
+			font-family: 'Press Start 2P', cursive;
 			background: #000;
-			color: #fff;
+			/*color: #fff;
 			font-family: sans-serif;
 			font-size: 2em;
-			text-align: center;
+			*/text-align: center;
+			height: 100%;
+			width: 100%;
+			overflow-y: hidden;
+		}
+
+		.menu {
+			/*display: flex;
+			justify-content: center;
+			align-items: center;
+			*/margin: 0% auto;
+			/*height: 30%;
+			border: 4px solid #000;
+			margin-top: 2%;
+			padding: 10% 20%;
+			*/
+			padding-top: 10%;
+			width: 100%;
+			height: 100%;
+			color: red;
+			/*position: absolute;
+			top: 30%;
+			left: 50%;
+			transform: translate(-50%, -50%);
+			*/
+		}
+
+		.menu h2 {
+			display: block;
+			font-size: 220%;
+			padding-bottom: 8%;
+		}
+
+		.menu button, .menu input[type="submit"] {
+			float: right;
+			position: relative;
+			right: -40%;
+			bottom: 50%;
+			margin-bottom: 0%;
+		}
+
+
+		.menu .play-again-container label {
+			display: inline;
+		}
+
+		#main-menu label, .settings label  {
+			display: block;
+		}
+
+		.error_message {
+			color: red;
 		}
 
 		.player {
@@ -29,9 +83,181 @@
 		.score, .pieces {
 			display: inline-block;
 		}
+
+		.modal {
+			display: none; /* Hidden by default */
+			position: fixed; /* Stay in place */
+			z-index: 1; /* Sit on top */
+			left: 0;
+			top: 0;
+			width: 100%; /* Full width */
+			height: 100%; /* Full height */
+			background-color: rgb(0,0,0); /* Fallback color */
+			background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
+			background-color: #000;
+		}
+
+		.modal.show {
+			display: block;
+		}
+
+		/* Modal Content/Box */
+		.modal-content {
+			/*margin: 15% auto; /* 15% from the top and centered */
+			/*padding: 20px;
+			border: 1px solid #888;
+			width: 80%;*/ /* Could be more or less, depending on screen size */
+			width: 100%;
+		}
 	</style>
 </head>
 <body>
+
+	<div class="modal main show">
+			<div class="modal-content">
+	<section class="menu">
+		<form id="main-menu">
+			<h2 id="articles">Red Tetris</h2>
+
+			<label>
+				<input type="radio" class="nes-radio" name="mode" value="multiplayer" />
+				<span>Multiplayer</span>
+			</label>
+
+			<label>
+				<input type="radio" class="nes-radio" name="mode" value="1-player" checked />
+				<span>Single Player</span>
+			</label>
+
+			<label>
+				<input type="radio" class="nes-radio" name="mode" value="2-player" />
+				<span>2 Players</span>
+			</label>
+
+			
+			<label>
+				<input type="radio" class="nes-radio" name="mode" value="settings" />
+				<span>Settings</span>
+			</label>
+
+		</form>
+	</section>
+			</div>
+	</div>
+
+		<div class="modal muliplayer">
+			<div class="modal-content">
+
+	<section class="menu">
+		<form id="start-game">
+			<div class="name-container">
+				<h3>Game Room</h3>
+
+				<h4>Your name: <span>Catman</span></h4>
+
+				<div class="nes-field">
+					<label for="name_field">Your name</label>
+					<input type="text" class="nes-input">
+				</div>
+
+				<span class="error_message">Shit... Something happened</span>
+				<input type="button" id="name_btn" class="nes-btn" value="Change name" />
+			</div>
+
+			<div class="player-list">
+				<h4>Player list</h4>
+				
+				<div class="lists">
+					<ul class="nes-list is-disc">
+						<li>Catman (you)</li>
+						<li>Joker</li>
+						<li>Catt Williams</li>
+					</ul>
+				</div>
+			</div>
+				
+			<input type="submit" class="nes-btn is-success" value="Start game" />
+		</form>
+	</section>
+			</div>
+		</div>
+
+	<div class="modal pause">
+		<div class="modal-content">
+			<section class="menu">
+				<form id="pause">
+					<h2>Paused</h2>
+
+					<label>
+						<input type="checkbox" class="nes-checkbox" checked />
+						<span>Quit game</span>
+					</label>
+				</form>
+			</section>
+		</div>
+	</div>
+
+
+
+	<div class="modal settings">
+			<div class="modal-content">
+	<section class="menu">
+		<form id="settings">
+			<h2>Settings</h2>
+
+			<label>
+				<input type="checkbox" value="toggleSounds" class="nes-checkbox" checked />
+				<span>Enable sounds</span>
+			</label>
+	
+			<label>
+				<input type="checkbox" value="toggleColours" class="nes-checkbox" checked />
+				<span>Disable colours</span>
+			</label>
+
+			<label>
+				<input type="checkbox" value="togglePeers" class="nes-checkbox" />
+				<span>Show peers game</span>
+			</label>
+
+			<!--<label>
+				<input type="radio" class="nes-radio" name="mode" />
+				<span>Multiplayer</span>
+			</label>-->
+
+			<button type="submit" class="nes-btn is-primary">Continue</button>
+			
+		</form>
+	</section>
+			</div>
+	</div>
+
+	<div class="modal game-over">
+			<div class="modal-content">
+
+	<section class="menu">
+		<form id="game-over">
+			<h2>Game over</h2>
+
+			<div class="modal-content">
+				Play again
+
+				<label>
+					<input type="radio" class="nes-radio" name="try-again" value="Yes" checked/>
+					<span>Yes</span>
+				</label>
+
+				<label>
+					<input type="radio" class="nes-radio" name="try-again" value="No" />
+					<span>No</span>
+				</label>
+			</div>
+		</form>
+	</section>
+			</div>
+	</div>
+
+
 	<template id="player-template">
 		<div class="player">
 			<div class="score"></div>

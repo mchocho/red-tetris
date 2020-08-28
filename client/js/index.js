@@ -1,3 +1,7 @@
+document.addEventListener('DOMContentLoaded', (event) => {
+const AUDIO = new Audio('assets/sound.mp3');
+
+
 function Arena(w, h) {
 	if (dev) {
 		console.log('Creating matrix');
@@ -56,6 +60,16 @@ function Arena(w, h) {
 				});
 			});
 			events.emit('matrix', matrix);
+		},
+
+		setMatrix(value) {
+			if (!value) return;
+			if (!value.every(row => row.every(el => !isNaN(el)))) return
+
+		//	matrix = value;
+			value.forEach((row, index) => {
+				matrix[index] = value[index];
+			});
 		},
 
 		sweep(/*arena, */player) {
@@ -172,8 +186,15 @@ function connectionManager(gameManager) {
 		if (prop === 'score') {
 			game.updatePanel();
 		}
-		else {
-			console.log('YOU SHOULD BE DRAWING!');
+		else if (prop === 'pos') {
+			//game.player.newPosition(value);
+			game.player.x = value.x;
+			game.player.y = value.y;
+			game.draw(game);
+		}
+		else if (prop === 'matrix') {
+			//console.log('YOU SHOULD BE DRAWING!');
+			game.arena.setMatrix(value);
 			game.draw(game);
 		}
 	}
@@ -328,7 +349,7 @@ function Events() {
 }
 
 
-function Game(element) {
+function Game(element, gameManager) {
 	if (dev) {
 		console.log('Starting game');
 	}
@@ -359,10 +380,12 @@ function Game(element) {
 			game.drawMatrix(player.matrix, player.pos);
 		},
 		drawMatrix(matrix, offset) {
+			const useColours = gameManager.disableColours === false;
+
 			matrix.forEach((row, y) => {
 				row.forEach((value, x) => {
 					if (value !== 0) {
-						context.fillStyle = colours[value];
+						context.fillStyle = useColours ? colours[value] : 'red';
 						context.fillRect(x + offset.x,
 								 y + offset.y,
 						 		 1, 1);
@@ -378,7 +401,7 @@ function Game(element) {
 			element.querySelector('.pieces').textContent = `Pieces: ${game.player.getPieceCount()}`;
 		}
 	};
-	let player = Player(game);
+	let player = Player(game, gameManager);
 	let lastTime = 0;
 
 	function update(time = 0) {
@@ -411,8 +434,11 @@ function Game(element) {
 	};
 
 	game.unserialize = function(state) {
-		arena = Object.assign(state.arena);
-		player = Object.assign(state.player);
+		//arena = Object.assign(state.arena);
+		console.log('Unserialized arena: ', state.arena);
+		arena.setMatrix(state.arena.matrix);
+		//player = Object.assign(state.player);
+		game.player.newPosition(state.player);
 		game.updatePanel();
 		game.draw(game);
 	}
@@ -424,9 +450,15 @@ function Game(element) {
 	return game;
 }
 
-function GameManager(mode='multiplayer') {
+function GameManager() {
 	const instances = new Set; //Arrays are not optimal and may hold duplicates
 	const template = document.getElementById('player-template');
+
+	//connection = connectionManager(gameManager);
+	let mode = null;
+	let paused = true;
+	let isRunning = false;
+	let gameOver = true;
 
 	//Hardcoded player add functionality
 	/*const playerElements = document.querySelectorAll('.player');
@@ -436,38 +468,139 @@ function GameManager(mode='multiplayer') {
 		instances.push(element);
 	 });*/
 
+	function closeMenus() {
+		const el = document.querySelectorAll('.modal');
+
+		for (let i = 0; i < el.length; i++) {
+			el[i].classList.remove('show');
+		}
+	} 
+
+	function createPlayer(gameManager, isLocal=false) {
+		const element = document
+				.importNode(template.content, true)
+				.children[0];
+		const tetris = Game(element, gameManager);
+		
+		tetris.isLocal = (isLocal === true);
+		instances.add(tetris);
+		document.body.appendChild(element); //Append to a div or something
+
+		return tetris;
+	}	
+
+	function openMenu(value) {
+		closeMenus();
+		let el;
+
+		switch(value) {
+			case 'settings':
+			case 'game-over':
+			case 'multiplayer':
+				el = document.querySelector('.modal.' + value);
+				break;
+			default:
+				el = document.querySelector('.modal.main');
+		}
+		if (el) {
+			el.classList.add('show');
+			el.querySelector('form').focus();
+		}
+	}	
+
+	function removePlayer(player) {
+		instances.delete(player);
+		document.body.removeChild(player.element);
+	}
+
 	return {
 		instances,
-		createPlayer() {
-			const element = document
-					.importNode(template.content, true)
-					.children[0];
-			const tetris = Game(element);
-
-			instances.add(tetris);
-			document.body.appendChild(element);
-
-			return tetris;
+		state: null,
+		isGameOver() {
+			return gameOver === true;
+		},
+				openMenu(value='main') {
+			openMenu(value);
+		},
+		gameOver() {
+			gameOver = true;
+		},
+		isPaused() {
+			return paused === true;
+		},
+		isRunning() {
+			return isRunning === true;
+		},
+		getMode() {
+			return mode;
 		},
 		removePlayer(player) {
-			this.instances.delete(player);
-			document.body.removeChild(player.element);
+			removePlayer(player);
+		},
+		setMode(value) {
+			const modes = ['1-player', '2-player', 'multiplayer'];
+
+			if (modes.indexOf(value) > -1)
+				mode = value;
+			else mode = '1-player';
+		},
+		startNewGame(gameManager) {
+			isRunning = true;
+			paused = false;
+			gameOver = false;
+
+			if (instances.size > 0) {
+				[...instances].forEach((player) => {
+					removePlayer(player);
+				});
+			}
+
+			const localPlayer = createPlayer(gameManager, true);
+			let player2;
+	
+			closeMenus();
+			localPlayer.element.classList.add('local');
+			switch(gameManager.getMode()) {
+				case '2-player':
+					player2 = createPlayer(gameManager);
+					localPlayer.run();
+					player2.run();
+					break;
+				case 'multiplayer':
+					//game.Manager.start
+					//connection.connect('ws://localhost:9000');
+					break;
+				default:
+					localPlayer.run();
+					return;
+			}
 		}
+
 	};
 }
 
-function Player(game) {
+function Player(game, gameManager) {
 	if (dev) {
 		console.log('New player joined');
 	}
 
 	const pos = {x: 0, y: 0};
 	const arena = game.arena;
-	
 	const events = Events(); 
 	
-	let pieceCount = 0;
+	let gameOver = false;
 	let dropCounter = 0;	
+	let pieceCount = 0;
+
+
+	function onGameOver(player) {
+		gameOver = true;
+		
+		if (game.isLocal || gameManager.getMode() === '2-player') {
+			gameManager.openMenu('game-over');
+		}
+		gameManager.state = 'game-over';
+	}
 
 	return {
 		game,
@@ -482,9 +615,12 @@ function Player(game) {
 			events.listen(name, callback);
 		},
 		drop(player) {
+			if (gameOver) return;
+
 			pos.y++;
 			dropCounter = 0;
 			if (arena.collide(arena, player)) {
+				AUDIO.play();
 				pos.y--;
 				arena.merge(arena.matrix, player);
 				player.reset(player);
@@ -499,18 +635,22 @@ function Player(game) {
 		},
 
 		dropPieceInPile(player) {
+			if (gameOver) return;
+
 			while(!arena.collide(arena, player)) {
 				pos.y++;
 			}
 			player.move(player, -1, 'y');
 			player.drop(player);
-		},
+		},	
 
 		getPieceCount() {
 			return pieceCount;
 		},
 
 		move(player, dir, axis='x') {
+			if (gameOver) return;
+
 			//Return true if no collision was detected otherwise false
 			pos[axis] += dir;
 
@@ -522,7 +662,25 @@ function Player(game) {
 			return true;
 		},
 
+		newGame(player) {
+			gameOver = true;
+			arena.matrix.forEach(row => row.fill(0)); //Clean the arena
+			player.score = 0;
+			pieceCount = 0;
+		},
+
+		newPosition(value) {
+			if (gameOver) return;
+			if (!value) return;
+			if (isNaN(value.x) || isNaN(value.y)) return;
+
+			pos.x = value.x;
+			pos.y = value.y;
+		},
+
 		reset(player) {
+			if (gameOver) return;
+			
 			const pieces = 'ILJOTSZ';
 
 			//New piece should be provided by server
@@ -533,17 +691,18 @@ function Player(game) {
 
 			if (arena.collide(arena, player)) {
 				//Game over
-				arena.matrix.forEach(row => row.fill(0)); //Remove everything from the arena
-				player.score = 0; //Maybe on new game
-				pieceCount = 0; //Maybe on new game
-				events.emit('score', player.score);
-				//game.updatePanel();
+				onGameOver(player);
+				events.emit('game-over', {
+					score: player.score
+				});
 			}
 			events.emit('pos', pos);
 			events.emit('matrix', player.matrix);
 		},
 
 		rotate(player, dir) {
+			if (gameOver) return;
+
 			const xAxis = pos.x;
 			let offset = 1;
 
@@ -561,6 +720,8 @@ function Player(game) {
 		},
 
 		_rotateMatrix(matrix, dir) {
+			if (gameOver) return;
+
 			for (let y = 0; y < matrix.length; ++y) {
 				for (let x = 0; x < y; ++x) {
 				//Swap values respectfully between first and last rows or columns
@@ -583,6 +744,8 @@ function Player(game) {
 
 
 		update(player, deltaTime) {
+			if (gameOver) return;
+
 			dropCounter += deltaTime;
 
 			if (dropCounter > player.dropInterval) {
@@ -592,6 +755,8 @@ function Player(game) {
 		
 
 		verticalAlign(player, dir=-1, jump=false) {
+			if (gameOver) return;
+
 			//Move to the side
 			if (dev) {
 				console.log('Aligning tetromino vertically');
@@ -628,6 +793,70 @@ function Player(game) {
 	};
 }
 
+function menuOptions(gameManager) {
+	let element;
+
+	switch(gameManager.state) {
+		case 'settings':
+			//Hide settings menu
+			//Show main menu
+			gameManager.openMenu('.main');
+			gameManager.state = null;
+			break;
+		case 'multiplayer':
+			//Hide start game menu
+			//
+			break;
+		case 'game-over':
+			element = document.querySelector('#game-over input:checked');
+
+			if (!element)
+				return;
+
+			let value = element.value.toLowerCase();
+
+			if (value === 'yes') {
+				gameManager.startNewGame(gameManager);
+			} else {
+				gameManager.openMenu('.main');
+				gameManager.state = null;
+			}
+
+			break;
+		default: {
+			element = document.querySelector('#main-menu input:checked');
+
+			if (!element)
+				return;
+
+			let value = element.value;
+
+			switch(value) {
+				case '1-player':
+				case '2-player':
+					//Start the game;
+					gameManager.setMode(value);
+					gameManager.startNewGame(gameManager);
+					break;
+				case 'multiplayer':
+					//Open multiplayer menu
+					gameManager.setMode(value);
+					gameManager.initSession();
+					break;
+				case 'settings':
+					//gameManager.setMode(value);
+					gameManager.state = 'settings';
+					gameManager.openMenu(value);
+					break;
+				default:
+					return;
+			}
+		}
+	}
+
+	//console.log('Checked element: ', element.value);
+}
+
 //To quickly fill a row
 //arena[19].fill(1)
 
@@ -641,30 +870,55 @@ function Player(game) {
 const dev = true;
 const logEvents = true;
 const collisionStatus = false;
+//let gameState = false;
 const gameManager = GameManager();
-const localTetris = gameManager.createPlayer();
+//let gameManager;
+//const localPlayer = gameManager.createPlayer();
 
 //Create socket connection
-const connection = connectionManager(gameManager);
+/*const connection = connectionManager(gameManager);
 connection.connect('ws://localhost:9000');
 
 let gameActive = false;
 
 
-localTetris.element.classList.add('local');
-localTetris.run();
-
+localPlayer.element.classList.add('local');
+localPlayer.run();
+*/
  
 //Run in console to manipulate tetromino
-//localTetris.player.rotate(tetri[0].player, -1)
+//localPlayer.player.rotate(tetri[0].player, -1)
 
 
 //Controller
 const keyListener = (event) => {
-	if (dev) {
+	/*if (dev) {
 		console.log(event);
+	}*/
+	if (!gameManager.isActive && event.type === 'keydown') {
+		switch(event.keyCode) {
+			case 8:		//Backspace
+			case 27:	//Escape
+				gameManager.openMenu('.main');
+				break;
+			case 13:	//Enter
+			case 32:	//Space
+				menuOptions(gameManager);
+				break;
+		}
+		/*if (event.keyCode === 8 || event.keyCode === 27) {
+			gameManager.openMenu('.main');
+			return;
+		}
+
+		if (event.keyCode === 13 || event.keyCode === 32) {
+			//Enter or space key pressed
+		}*/
+
 	}
-	const gameState = [...gameManager.instances];
+
+
+	const games = [...gameManager.instances];
 
 	[
 		//Player 1
@@ -676,7 +930,8 @@ const keyListener = (event) => {
 			40, //4 Down key	(Go down)
 			68, //5 D key		(Drop piece in pile)
 			81, //6 Q key 		(Rotate anti-clockwise)
-			87  //7 R key 		(Rotate clockwise)
+			87, //7 R key 		(Rotate clockwise)
+			80  //8 P key		(Pause)
 		],
 		//Player 2
 		[
@@ -690,14 +945,16 @@ const keyListener = (event) => {
 			null
 		]
 	].forEach((key, index) => {
-		if (!gameState[index])
+		if (!games[index])
 			return;
 
-		/*if (index === 1 && gameManager.mode !== '2-player') {
+		if (index === 1 && gameManager.getMode() !== '2-player')
 		 	return;	//Check if mode is in 2 player
-		 }*/
 
-		const player = gameState[index].player;
+		if (index > 1)
+			return;
+
+		const player = games[index].player;
 		
 		if (event.type === 'keydown') {
 			switch(event.keyCode) {
@@ -724,6 +981,12 @@ const keyListener = (event) => {
 				case key[6]:
 					player.rotate(player, -1);	//Q
 					break;
+				case key[8]:
+					if (player.isPaused())
+						player.resume();
+					else
+						player.pause();
+					break;
 			}
 		}
 
@@ -741,5 +1004,67 @@ const keyListener = (event) => {
 	});
 };
 
+const formListener = (event) => {
+	const el = event.target;
+
+	if (!el) return;
+
+	const tagName = el.tagName.toLowerCase();
+
+	if (tagName === 'form') {
+		el.focus();
+	}
+	if (tagName === 'input' && el.type === 'radio') {
+		el.checked = true;
+	}
+	if (tagName === 'label' && el.firstElementChild) {
+		const firstChild = el.firstElementChild;
+
+		if (firstChild.tagName.toLowerCase() === 'input' && firstChild.type === 'radio')
+			firstChild.focus();
+	}
+}
+
+const formSubmit = (event) => {
+	event.preventDefault();
+
+
+	if (!gameManager.isActive) {
+		//Enter or space key pressed
+		menuOptions(gameManager);
+
+	}
+
+
+	//console.log("Triggered by: ", event.target.id);
+};
+
+const settingsListener = (event) => {
+	const el = event.target;
+
+	console.log('Game state: ', gameManager.state);
+
+	if (!el || gameManager.state !== 'settings')
+		return;
+
+	const value = el.value;
+
+	if (value === 'toggleSounds')
+		gameManager.enableSound = el.checked;
+	else if (value === 'toggleColours')
+		gameManager.disableColours = el.checked;
+	else if (value === 'togglePeers')
+		gameManager.showPeers = el.checked;
+
+	console.log("Triggered by: ", el);
+	console.log('Checked: ', el.checked);
+};
+
+
 document.addEventListener('keydown', keyListener); 
 document.addEventListener('keyup', keyListener); 
+document.addEventListener('mouseover', formListener);
+document.addEventListener('submit', formSubmit);
+document.addEventListener('change', settingsListener);
+
+});
