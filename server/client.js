@@ -3,10 +3,12 @@
 const DEV = process.env.DEV;
 
 class Client {
-        constructor(conn, id, name) {
+        constructor(conn, id) {
                 this.conn = conn;       //Store the clients connection
                 this.id = id;
-		this.name = name;
+		this.isPlaying = false;
+		this.name = null;
+		this.pieces = 0;
 		this.score = 0;
                 this.session = null;    //Session the client will live in
 		this.state = null;

@@ -1,10 +1,10 @@
 class Session {
-        constructor(id, userId)
+        constructor(id, client)
         {
                 this.id = id;
                 this.clients = new Set;
-		this.gameStarted = false;
-		this.owner = userId;
+		this.isRunning = false;
+		this.owner = client.id;
 		this.pieceLayout = [];
         }
 	addNewPiece() {
@@ -14,6 +14,28 @@ class Session {
 
 		this.pieceLayout.push(pieces[index]);
 		return pieces[index];
+	}
+	getNewOwner() {
+		const clients = [...this.clients];
+
+		if (clients.some(client => client.id !== this.owner)) {
+			const client = clients[0];
+
+			this.owner = client.id;
+
+
+			//DEV
+			console.log('New game room owner is ', client.name);
+			//ENDOF DEV
+
+
+			client.send({type: 'owner-permissions'});
+
+			client.broadcast({
+				type: 'new-owner',
+				id: client.id
+			});
+		}
 	}
         join(client)
         {

@@ -5,7 +5,7 @@
 	<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 	<style>
 		body {
-			display: flex;
+			display: block;
 			font-family: 'Press Start 2P', cursive;
 			background: #000;
 			/*color: #fff;
@@ -15,6 +15,7 @@
 			height: 100%;
 			width: 100%;
 			overflow-y: hidden;
+			color: red;
 		}
 
 		.menu {
@@ -61,11 +62,16 @@
 			display: block;
 		}
 
+		.game-link {
+			margin-bottom: 10%;
+		}
+
 		.error_message {
-			color: red;
+			margin-bottom: 10%
 		}
 
 		.player {
+			display: inline-block;
 			flex: 1 1 auto;
 		}
 		
@@ -109,6 +115,29 @@
 			width: 80%;*/ /* Could be more or less, depending on screen size */
 			width: 100%;
 		}
+
+		#game {
+			display: flex;
+		}
+
+		#game .player-list {
+			/*width: 10%;
+			*/float: left;
+			display: inline-block;
+		}
+
+		#game .players {
+			display: inline;
+		}
+
+		.cmd {
+			animation: blink 1.2s infinite;
+		}
+
+		@keyframes blink {
+			60% { opacity: 0 }
+			/*100% { visibility: visible; }*/
+		}
 	</style>
 </head>
 <body>
@@ -145,23 +174,15 @@
 			</div>
 	</div>
 
-		<div class="modal muliplayer">
+		<div class="modal multiplayer">
 			<div class="modal-content">
 
 	<section class="menu">
 		<form id="start-game">
-			<div class="name-container">
-				<h3>Game Room</h3>
-
-				<h4>Your name: <span>Catman</span></h4>
-
-				<div class="nes-field">
-					<label for="name_field">Your name</label>
-					<input type="text" class="nes-input">
-				</div>
-
-				<span class="error_message">Shit... Something happened</span>
-				<input type="button" id="name_btn" class="nes-btn" value="Change name" />
+			<h3>Game Room</h3>
+				
+			<div class="game-link">
+				<span class="url"></span>
 			</div>
 
 			<div class="player-list">
@@ -169,14 +190,23 @@
 				
 				<div class="lists">
 					<ul class="nes-list is-disc">
-						<li>Catman (you)</li>
-						<li>Joker</li>
-						<li>Catt Williams</li>
+						<li>
+							<span class="you"></span>
+							<span>(You)</span>
+						</li>
+
+						<div class="alt-players"></div>
 					</ul>
 				</div>
 			</div>
-				
-			<input type="submit" class="nes-btn is-success" value="Start game" />
+
+			<div class="error_message">
+				Shit... Something happened
+			</div>
+
+			<div>
+				<p class="cmd"></p>
+			</div>
 		</form>
 	</section>
 			</div>
@@ -257,6 +287,53 @@
 			</div>
 	</div>
 
+	<div class="modal error">
+		<div class="modal-content">
+			<section class="menu">
+				<form id="error">
+					<h2>Aww snap</h2>
+
+					<p>Something went wrong...</p>
+				</form>
+			</section>
+		</div>
+	</div>
+
+	<div class="modal winner">
+		<div class="modal-content">
+			<section class="menu">
+				<form id="winner">
+					<h2>You won the game! <i class="nes-icon trophy is-large"></i></h2>
+
+					<div class="modal-content">
+						Continue
+
+						<label>
+							<input type="radio" class="nes-radio" name="try-again" value="Yes" checked/>
+							<span>Yes</span>
+						</label>
+
+						<label>
+							<input type="radio" class="nes-radio" name="try-again" value="No" />
+							<span>No</span>
+						</label>
+					</div>
+				</form>
+			</section>
+		</div>
+	</div>
+
+	<div class="modal loading">
+		<div class="modal-content">
+			<section class="menu">
+				<form id="loading">
+					<h2>Loading...</h2>
+				</form>
+			</section>
+		</div>
+	</div>
+
+
 
 	<template id="player-template">
 		<div class="player">
@@ -265,6 +342,24 @@
 			<canvas class="tetris" width="240" height="400"></canvas>
 		</div>
 	</template>
+
+	<div id="game">
+
+		<div class="player-list">
+			<ul class="nes-list is-disc">
+				<li class="you"></li> 
+
+				<div class="alt-players">
+					<!-- <li>Player 1 (800 pts)</li>
+					<li>Player 2 (50 pts)</li> -->
+				</div>
+
+			</ul>
+		</div>
+
+		<div class="players"></div>
+
+	</div>
 
 	<script src="js/index.js"></script>
 </body>

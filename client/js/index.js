@@ -1,5 +1,9 @@
 document.addEventListener('DOMContentLoaded', (event) => {
-const AUDIO = new Audio('assets/sound.mp3');
+const SERVER_URL = 'ws://localhost:9000';
+//DEV
+const dev = true;
+const logEvents = false;
+const collisionStatus = false;
 
 
 function Arena(w, h) {
@@ -34,12 +38,12 @@ function Arena(w, h) {
 			for (let y = 0; y < m.length; ++y) {
 				for (let x = 0; x < m[y].length; ++x) {
 					if (m[y][x] !== 0 && //Check if player matrix is not 0
-			    		(arena.matrix[y + o.y] &&	//Check if arena has a row & is not 0)
+			    		(arena.matrix[y + o.y] &&	//Check if arena has a row & is not 0 and -1)
 			    		arena.matrix[y + o.y][x + o.x]) !== 0) {
-						if (collisionStatus) {
-							console.log('Collision detected');
-						}
-						return true; //There was a collision
+							if (collisionStatus) {
+								console.log('Collision detected');
+							}
+							return true; //There was a collision
 					}
 
 				}
@@ -79,8 +83,8 @@ function Arena(w, h) {
 			outer:
 			for (let y = /*arena.*/matrix.length - 1; y > 0; --y) { //Started from the bottom
 				for (let x = 0; x < /*arena*/matrix[y].length; ++x) {
-					//Check if any rows have a 0; meaning it's not fully populated
-					if (/*arena*/matrix[y][x] === 0) {
+					//Check if any rows have a 0, -1 or null; meaning it's not fully populated
+					if ([0, -1, null].indexOf(matrix[y][x]) > -1) {
 						continue outer;	//Continue on next row
 						//labels: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/label
 					}
@@ -93,10 +97,10 @@ function Arena(w, h) {
 				player.score += rowCount * 10;
 				rowCount *= 2;		//For every row doublw score
 				events.emit('matrix', matrix);
+				events.emit('sweep', true);
 
-				if (dev) {
+				if (dev)
 					console.log('Swept a row. Nice!');
-				}
 			}
 		}
 
@@ -104,23 +108,58 @@ function Arena(w, h) {
 }
 
 function connectionManager(gameManager) {
-	let connection = null;
 	const peers = new Map;
-	const localTetris = [...gameManager.instances][0];
+	const localTetris = gameManager.startNewGame(gameManager);
+	let connection = null;
+	let id = null;
+
+	function getSessionId() {
+		const hash = window.location.hash.split('#')[1];
+
+		if (!hash)
+			return null;
+
+		if (hash.length === 0)
+			return null;
+
+		if (hash.indexOf('[') === -1 || hash.indexOf(']') === -1)
+			return hash;
+
+		return hash.slice(0, hash.indexOf('[')); 
+	}
+
+	function getUsername() {
+		const hash = window.location.hash.split('#')[1];	//Everything after the hash
+
+		if (!hash)
+			return null;
+
+		if (hash.length === 0)
+			return null;
+
+		if (hash.indexOf('[') === -1 || hash.indexOf(']') === -1)
+			return null;
+
+		return hash.slice(hash.indexOf('[') + 1, hash.indexOf(']'));
+	}
 	
 	function initSession() {
-		const sessionId = window.location.hash.split('#')[1];	//Everything after the hash
+		const sessionId = getSessionId();
+		const name = getUsername();
+
 		const state = localTetris.serialize(localTetris);
 		if (sessionId) {
 			sendMessage({
 				type: 'join-session',
 				id: sessionId,
+				name,
 				state
 			})
 		}
 		else {
 			sendMessage({
 				type: 'create-session',
+				name,
 				state
 			});
 			//connection.send('create-session');
@@ -128,17 +167,50 @@ function connectionManager(gameManager) {
 	}
 
 	function receive(msg) {
-		const data = JSON.parse(msg);
+		//DEV: Testing url game id and player name hash-based url type
+		//http://<server_name_or_ip>:<port>/#<room>[<player_name>]
+		// return;
 
-		if (data.type === 'session-created') {
-			window.location.hash = data.id;
+		const data = JSON.parse(msg);
+		const menu = document.querySelector('#start-game');
+
+		if (data.type === 'session-created' || data.type === 'session-join') {
+			if (data.type === 'session-created') {
+				window.location.hash = `${data.id}[${data.name}]`;
+				menu.querySelector('.cmd').textContent = 'Press Enter to start';
+			}
+			id = data.id;
+			gameManager.openMenu('multiplayer');
+			menu.querySelector('.url').textContent = `${window.location.origin}/#${data.id}`;
+			menu.querySelector('.you').textContent = data.name;
+		}
+		else if (data.type === 'start-game' ) {
+			//updatePeerList(data.clientId, data.state);
+			gameManager.startNewGameLAN(gameManager);
 		}
 		else if (data.type === 'session-broadcast') {
+			if (data.id) {
+				id = data.id;
+			}
 			updateManager(data.peers);
 		}
+		else if (data.type === 'penalty') {
+			console.log('Meet the punisher');
+		}
 		else if (data.type === 'state-update') {
-			console.log('Received content: ', data);
+			if (dev) console.log('Received content: ', data);
 			updatePeer(data.clientId, data.fragment, data.state);
+		}
+		else if (data.type === 'game-winner') {
+			if (!gameManager.isRunning())
+				return;
+
+			gameManager.gameOver(false);
+			gameManager.openMenu('winner');
+			gameManager.state = 'winner';
+		}
+		else if (data.type === 'owner-permissions') {
+			menu.querySelector('.cmd').textContent = 'Press Enter to start';
 		}
 	}
 
@@ -153,16 +225,35 @@ function connectionManager(gameManager) {
 	
 	function updateManager(peersList) {
 		const me = peersList.you;
-		const clients = peersList.clients.filter(client => me !== client.id);
+		const clients = peersList.clients.filter(client => me !== client.id);	//Remove local player from list
+		const hidePeers = (!gameManager.showPeers);
+		const playerList = document.querySelector('.alt-players');
 
+		playerList.innerHTML = '';
 		clients.forEach(client => {
+			//Add name to player list
+			playerList.innerHTML += `<li>
+							${client.name}
+							${client.playing ? ' <i class="nes-jp-logo"></i>' : ''}
+						</li>`;
+
 			if (!peers.has(client.id)) {
 				//Adds new player to the game view
-				const player = gameManager.createPlayer();
+				const player = gameManager.createPlayer(hidePeers);
 
 				player.unserialize(client.state)
 				peers.set(client.id, player);
+
+				console.log('YOU SHOULD ADD NEW PEER');
+				console.log('Peer list: ', peers);
+
 			}
+
+			
+
+			//You should update scores here
+			//Handle player list render
+
 		});
 
 		[...peers.entries()].forEach(([id, player]) => {
@@ -213,7 +304,7 @@ function connectionManager(gameManager) {
 			});
 		});
 
-		['matrix'].forEach(prop => {
+		['matrix', 'sweep'].forEach(prop => {
 			arena.addListener(prop, value => {
 				sendMessage({
 					type: 'state-update',
@@ -239,6 +330,12 @@ function connectionManager(gameManager) {
 	}
 
 	return {
+		close() {
+			if (connection !== null) {
+				connection.close();
+			}
+			connection = null;
+		},
 		connect(address) {
 			connection = new WebSocket(address);
 
@@ -258,15 +355,29 @@ function connectionManager(gameManager) {
 				}
 				receive(event.data);
 			});
-		},		
+
+			connection.addEventListener('error', event => {
+				connection = null;
+				gameManager.state = null;
+				gameManager.gameOver(false);
+				gameManager.openMenu('error');
+				//gameManager.removeAllPlayers();
+			});
+		},
+		getSessionId() {
+			return id;
+		},
+		isConnected() {
+			return connection !== null;
+		},
 		send(data) {
 			sendMessage(data);
-		}
+		},
 	};
 }
 
 function createPiece(type) {
-//3x3 or higher because you can't rotate with less
+	//3x3 or higher because you can't rotate with less
 	if (type === 'T') {
 		return [
 			[0, 0, 0],
@@ -385,13 +496,21 @@ function Game(element, gameManager) {
 			matrix.forEach((row, y) => {
 				row.forEach((value, x) => {
 					if (value !== 0) {
-						context.fillStyle = useColours ? colours[value] : 'red';
+						if (value === null)
+							context.fillStyle = 'white';	//Permanent wall
+						else if (value === -1)
+							context.fillStyle = 'grey';		//Breakable wall
+						else
+							context.fillStyle = useColours ? colours[value] : 'red';
 						context.fillRect(x + offset.x,
 								 y + offset.y,
 						 		 1, 1);
 					}
 				});
 			});
+		},
+		reset() {
+			arena.clear(arena);
 		},
 		run() {
 			update();
@@ -405,7 +524,12 @@ function Game(element, gameManager) {
 	let lastTime = 0;
 
 	function update(time = 0) {
-	//We need to make this reusable
+		//We need to make this reusable
+		if (!gameManager.isRunning()) {
+			console.log('Game is not running');
+			return;
+		}
+
 		const deltaTime = time - lastTime;
 
 		lastTime = time;
@@ -454,7 +578,7 @@ function GameManager() {
 	const instances = new Set; //Arrays are not optimal and may hold duplicates
 	const template = document.getElementById('player-template');
 
-	//connection = connectionManager(gameManager);
+	let connection = null;
 	let mode = null;
 	let paused = true;
 	let isRunning = false;
@@ -476,69 +600,147 @@ function GameManager() {
 		}
 	} 
 
-	function createPlayer(gameManager, isLocal=false) {
+	function createPlayer(gameManager, isLocal=false, hide=false) {
 		const element = document
 				.importNode(template.content, true)
 				.children[0];
 		const tetris = Game(element, gameManager);
+		const container = document.querySelector('#game .players');
 		
 		tetris.isLocal = (isLocal === true);
+		tetris.hidden = (hide === true);
 		instances.add(tetris);
-		document.body.appendChild(element); //Append to a div or something
+
+		if (!hide)
+			container.appendChild(element); //Append to a div or something
 
 		return tetris;
-	}	
+	}
 
 	function openMenu(value) {
 		closeMenus();
-		let el;
 
 		switch(value) {
 			case 'settings':
 			case 'game-over':
 			case 'multiplayer':
+				if (value === 'multiplayer') {
+					gameOver = false;
+					isRunning = false;
+				}
+			case 'winner':
+			case 'loading':
+			case 'error':
 				el = document.querySelector('.modal.' + value);
 				break;
 			default:
+				if (connection)
+					connection.close();
+				window.location.hash = '';
+				removeAllPlayers();
 				el = document.querySelector('.modal.main');
 		}
 		if (el) {
 			el.classList.add('show');
 			el.querySelector('form').focus();
+
+			const input = el.querySelector('input:checked:first-of-type');
+
+			if (input) input.focus();
 		}
 	}	
 
-	function removePlayer(player) {
-		instances.delete(player);
-		document.body.removeChild(player.element);
+	function removeAllPlayers() {
+		[...instances].forEach((game) => {
+			removePlayer(game);
+		});
+	}
+
+	function removePlayer(game) {
+		const container = document.querySelector('#game .players');
+
+		game.player.gameOver();
+		instances.delete(game);
+
+		if (!game.hidden)
+			container.removeChild(game.element);
 	}
 
 	return {
 		instances,
 		state: null,
-		isGameOver() {
-			return gameOver === true;
+		closeSession() {
+			if (connection)
+				connection.close();
 		},
-				openMenu(value='main') {
-			openMenu(value);
+		createPlayer(hide=false) {
+			return createPlayer(gameManager, false, hide);
 		},
-		gameOver() {
+		gameOver(menu=true) {
+			if (menu)
+				openMenu('game-over');
+
+			if (mode !== 'multiplayer') {
+				removeAllPlayers();
+			}
+			else if (connection) {
+				if (!isRunning)
+					return;
+
+				[...instances].forEach(game => game.player.gameOver());
+				connection.send({
+					type: 'game-over',
+					id: connection.getSessionId()
+				});
+			}
+
+			isRunning = false;
 			gameOver = true;
-		},
-		isPaused() {
-			return paused === true;
-		},
-		isRunning() {
-			return isRunning === true;
 		},
 		getMode() {
 			return mode;
+		},
+		initRoom(gameManager) {
+			if (connection)
+				connection.close();		//Close current connection
+
+			if (!connection || instances.size === 0)
+				connection = connectionManager(gameManager);
+
+			if (!connection.isConnected())
+				connection.connect(SERVER_URL);
+		},
+		isGameOver() {
+			return gameOver;
+		},
+		isPaused() {
+			return paused;
+		},
+		isRunning() {
+			return isRunning;
+		},
+		onPageLoaded(gameManager) {
+			const hash = window.location.hash.split('#')[1];
+
+			if (!hash)
+				return;
+
+			if (hash.length === 0)
+				return;
+
+			mode = 'multiplayer';
+			gameManager.state = 'multiplayer';
+			gameManager.openMenu('loading');
+			gameManager.initRoom(gameManager);
+		},
+		openMenu(value='main') {
+			openMenu(value);
 		},
 		removePlayer(player) {
 			removePlayer(player);
 		},
 		setMode(value) {
-			const modes = ['1-player', '2-player', 'multiplayer'];
+			const modes = [null, '1-player', '2-player', 'multiplayer'];
 
 			if (modes.indexOf(value) > -1)
 				mode = value;
@@ -549,11 +751,7 @@ function GameManager() {
 			paused = false;
 			gameOver = false;
 
-			if (instances.size > 0) {
-				[...instances].forEach((player) => {
-					removePlayer(player);
-				});
-			}
+			removeAllPlayers();	
 
 			const localPlayer = createPlayer(gameManager, true);
 			let player2;
@@ -567,13 +765,51 @@ function GameManager() {
 					player2.run();
 					break;
 				case 'multiplayer':
-					//game.Manager.start
-					//connection.connect('ws://localhost:9000');
-					break;
+					gameManager.openMenu('loading');
+					isRunning = false;
+					return localPlayer;
 				default:
 					localPlayer.run();
 					return;
 			}
+		},
+		startSession(gameManager) {
+			if (!connection.isConnected()) {
+				gameManager.openMenu('error');
+				return;
+			}
+			if (gameManager.getMode() !== 'multiplayer') return;
+			if (gameManager.isRunning()) return;
+			
+			console.log('Session id: ');
+
+			connection.send({
+				type: 'start-game',
+				id: connection.getSessionId()
+			});
+			return;
+		},
+		startNewGameLAN(gameManager) {
+			if (!connection.isConnected()) {
+				gameManager.openMenu('error');
+				return;
+			}
+			if (gameManager.getMode() !== 'multiplayer') return;
+			if (gameManager.isRunning()) {
+				console.log('game is running');
+				return;
+			}
+
+			const game = [...instances][0];
+
+			game.reset();
+			closeMenus();
+			isRunning = true;
+			gameOver = false;
+
+			//There's a bug, on replay instances is undefined
+			game.player.newGame(game.player);
+			game.run(true);
 		}
 
 	};
@@ -584,6 +820,7 @@ function Player(game, gameManager) {
 		console.log('New player joined');
 	}
 
+	const AUDIO = new Audio('assets/sound.mp3');
 	const pos = {x: 0, y: 0};
 	const arena = game.arena;
 	const events = Events(); 
@@ -594,12 +831,13 @@ function Player(game, gameManager) {
 
 
 	function onGameOver(player) {
+		const gameMode = gameManager.getMode();
 		gameOver = true;
 		
-		if (game.isLocal || gameManager.getMode() === '2-player') {
-			gameManager.openMenu('game-over');
+		if (game.isLocal || gameMode === '2-player') {
+			gameManager.gameOver();
+			gameManager.state = 'game-over';
 		}
-		gameManager.state = 'game-over';
 	}
 
 	return {
@@ -644,6 +882,10 @@ function Player(game, gameManager) {
 			player.drop(player);
 		},	
 
+		gameOver() {
+			gameOver = true;
+		},
+
 		getPieceCount() {
 			return pieceCount;
 		},
@@ -663,7 +905,9 @@ function Player(game, gameManager) {
 		},
 
 		newGame(player) {
-			gameOver = true;
+			gameOver = false;
+			// pos.x = 0;
+			// pos.y = 0;
 			arena.matrix.forEach(row => row.fill(0)); //Clean the arena
 			player.score = 0;
 			pieceCount = 0;
@@ -679,22 +923,35 @@ function Player(game, gameManager) {
 		},
 
 		reset(player) {
+			//This method needs to be an async function
+
 			if (gameOver) return;
 			
 			const pieces = 'ILJOTSZ';
 
 			//New piece should be provided by server
-			player.matrix = createPiece(pieces[pieces.length * Math.random() | 0]);
+			
+			/*if (gameManager.getMode() === 'multiplayer') {
+				fetchNewPiece()
+				.then(piece => {
+					player.matrix = piece;
+				})
+			}
+			else {*/
+				player.matrix = createPiece(pieces[pieces.length * Math.random() | 0]);
+			//}
 			pos.y = 0;
-			pos.x = (arena.matrix[0].length / 2 | 0) - (player.matrix[0].length / 2 | 0)
+			pos.x = (arena.matrix[0].length / 2 | 0) - (player.matrix[0].length / 2 | 0);
 			pieceCount++;
 
 			if (arena.collide(arena, player)) {
 				//Game over
 				onGameOver(player);
-				events.emit('game-over', {
+				// if ()
+
+				/*events.emit('game-over', {
 					score: player.score
-				});
+				});*/
 			}
 			events.emit('pos', pos);
 			events.emit('matrix', player.matrix);
@@ -743,7 +1000,7 @@ function Player(game, gameManager) {
 		},
 
 
-		update(player, deltaTime) {
+		update(player, deltaTime,) {
 			if (gameOver) return;
 
 			dropCounter += deltaTime;
@@ -796,6 +1053,7 @@ function Player(game, gameManager) {
 function menuOptions(gameManager) {
 	let element;
 
+	console.log('Running menu');
 	switch(gameManager.state) {
 		case 'settings':
 			//Hide settings menu
@@ -805,10 +1063,12 @@ function menuOptions(gameManager) {
 			break;
 		case 'multiplayer':
 			//Hide start game menu
-			//
+			gameManager.startSession(gameManager);
+			console.log('Starting new multiplayer game');
 			break;
 		case 'game-over':
-			element = document.querySelector('#game-over input:checked');
+		case 'winner':
+			element = document.querySelector(`#${gameManager.state} input:checked`);
 
 			if (!element)
 				return;
@@ -816,14 +1076,27 @@ function menuOptions(gameManager) {
 			let value = element.value.toLowerCase();
 
 			if (value === 'yes') {
-				gameManager.startNewGame(gameManager);
+					console.log('gameManager object: ', JSON.stringify(gameManager));
+					console.log('Game mode: ', gameManager.getMode());
+					console.log('Is game over: ', gameManager.isGameOver());
+					console.log('Is game running', gameManager.isRunning());
+
+				if (gameManager.getMode() === 'multiplayer') {
+					gameManager.state = 'multiplayer';
+					gameManager.openMenu('multiplayer');
+
+				}
+				else
+					gameManager.startNewGame(gameManager);
 			} else {
 				gameManager.openMenu('.main');
 				gameManager.state = null;
+				gameManager.setMode(null);
 			}
 
 			break;
 		default: {
+			//Main menu
 			element = document.querySelector('#main-menu input:checked');
 
 			if (!element)
@@ -840,12 +1113,13 @@ function menuOptions(gameManager) {
 					break;
 				case 'multiplayer':
 					//Open multiplayer menu
+					gameManager.state = value;
 					gameManager.setMode(value);
-					gameManager.initSession();
+					gameManager.initRoom(gameManager);
 					break;
 				case 'settings':
 					//gameManager.setMode(value);
-					gameManager.state = 'settings';
+					gameManager.state = value;
 					gameManager.openMenu(value);
 					break;
 				default:
@@ -867,11 +1141,9 @@ function menuOptions(gameManager) {
 
 
 //Main
-const dev = true;
-const logEvents = true;
-const collisionStatus = false;
 //let gameState = false;
 const gameManager = GameManager();
+gameManager.onPageLoaded(gameManager);
 //let gameManager;
 //const localPlayer = gameManager.createPlayer();
 
@@ -895,17 +1167,28 @@ const keyListener = (event) => {
 	/*if (dev) {
 		console.log(event);
 	}*/
-	if (!gameManager.isActive && event.type === 'keydown') {
+	if (event.keyCode === 8) {
+		console.log('Type', event.target.type);
+
+		event.preventDefault();
+
+		//Search for text input with focus if not available prevent defualt
+
+	}
+
+	if (!gameManager.isRunning() && event.type === 'keydown') {
 		switch(event.keyCode) {
 			case 8:		//Backspace
 			case 27:	//Escape
 				gameManager.openMenu('.main');
+				gameManager.state = null;
 				break;
 			case 13:	//Enter
 			case 32:	//Space
 				menuOptions(gameManager);
 				break;
 		}
+		return;
 		/*if (event.keyCode === 8 || event.keyCode === 27) {
 			gameManager.openMenu('.main');
 			return;
@@ -960,6 +1243,7 @@ const keyListener = (event) => {
 			switch(event.keyCode) {
 				case key[0]:
 					//Test left align then right align
+					//This is shit!!!
 					if (!player.verticalAlign(player, -1))
 						if (!player.verticalAlign(player, 1))
 							 if (!player.verticalAlign(player, -1, true))
@@ -1028,14 +1312,11 @@ const formListener = (event) => {
 const formSubmit = (event) => {
 	event.preventDefault();
 
-
-	if (!gameManager.isActive) {
+	/*if (!gameManager.isActive) {
 		//Enter or space key pressed
 		menuOptions(gameManager);
 
-	}
-
-
+	}*/
 	//console.log("Triggered by: ", event.target.id);
 };
 
@@ -1065,6 +1346,6 @@ document.addEventListener('keydown', keyListener);
 document.addEventListener('keyup', keyListener); 
 document.addEventListener('mouseover', formListener);
 document.addEventListener('submit', formSubmit);
-document.addEventListener('change', settingsListener);
+//document.addEventListener('change', settingsListener);
 
 });
