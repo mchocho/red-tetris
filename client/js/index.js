@@ -38,7 +38,7 @@ function Arena(w, h) {
 			for (let y = 0; y < m.length; ++y) {
 				for (let x = 0; x < m[y].length; ++x) {
 					if (m[y][x] !== 0 && //Check if player matrix is not 0
-			    		(arena.matrix[y + o.y] &&	//Check if arena has a row & is not 0 and -1)
+			    		(arena.matrix[y + o.y] &&	//Check if arena has a row & is not 0 and null)
 			    		arena.matrix[y + o.y][x + o.x]) !== 0) {
 							if (collisionStatus) {
 								console.log('Collision detected');
@@ -70,7 +70,7 @@ function Arena(w, h) {
 			if (!value) return;
 			if (!value.every(row => row.every(el => !isNaN(el)))) return
 
-		//	matrix = value;
+			//matrix = value;
 			value.forEach((row, index) => {
 				matrix[index] = value[index];
 			});
@@ -83,7 +83,7 @@ function Arena(w, h) {
 			outer:
 			for (let y = /*arena.*/matrix.length - 1; y > 0; --y) { //Started from the bottom
 				for (let x = 0; x < /*arena*/matrix[y].length; ++x) {
-					//Check if any rows have a 0, -1 or null; meaning it's not fully populated
+					//Check if any rows have a 0 or null; meaning it's not fully populated
 					if ([0, -1, null].indexOf(matrix[y][x]) > -1) {
 						continue outer;	//Continue on next row
 						//labels: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/label
@@ -109,9 +109,10 @@ function Arena(w, h) {
 
 function connectionManager(gameManager) {
 	const peers = new Map;
-	const localTetris = gameManager.startNewGame(gameManager);
+	const localPlayer = gameManager.startNewGame(gameManager);
 	let connection = null;
 	let id = null;
+	let layout = [];
 
 	function getSessionId() {
 		const hash = window.location.hash.split('#')[1];
@@ -146,8 +147,8 @@ function connectionManager(gameManager) {
 	function initSession() {
 		const sessionId = getSessionId();
 		const name = getUsername();
+		const state = localPlayer.serialize(localPlayer);
 
-		const state = localTetris.serialize(localTetris);
 		if (sessionId) {
 			sendMessage({
 				type: 'join-session',
@@ -193,9 +194,11 @@ function connectionManager(gameManager) {
 				id = data.id;
 			}
 			updateManager(data.peers);
+			layout = data.layout;
 		}
 		else if (data.type === 'penalty') {
 			console.log('Meet the punisher');
+			localPlayer.penalty(localPlayer);
 		}
 		else if (data.type === 'state-update') {
 			if (dev) console.log('Received content: ', data);
@@ -215,6 +218,9 @@ function connectionManager(gameManager) {
 	}
 
 	function sendMessage(data) {
+		if (!connection)
+			return;
+
 		const msg = JSON.stringify(data);
 
 		if (dev) {
@@ -222,6 +228,8 @@ function connectionManager(gameManager) {
 		}
 		connection.send(msg);
 	}
+
+
 	
 	function updateManager(peersList) {
 		const me = peersList.you;
@@ -291,8 +299,8 @@ function connectionManager(gameManager) {
 	}
 
 	function watchEvents() {
-		const player = localTetris.player;
-		const arena = localTetris.arena;
+		const player = localPlayer.player;
+		const arena = localPlayer.arena;
 
 		['pos', 'matrix', 'score'].forEach(prop => {
 			player.addListener(prop, value => {
@@ -364,6 +372,9 @@ function connectionManager(gameManager) {
 				//gameManager.removeAllPlayers();
 			});
 		},
+		getSessionLayout() {
+			return [].concat(layout);
+		},
 		getSessionId() {
 			return id;
 		},
@@ -373,62 +384,22 @@ function connectionManager(gameManager) {
 		send(data) {
 			sendMessage(data);
 		},
+		sendAndAck(data) {
+			return new Promise((resolve, reject) => {
+				if (!connection) {
+					reject(null);
+					return;
+				}
+
+				const msg = JSON.stringify(data);
+
+				connection.send(msg, function(result) {
+					console.log('hello result: ', result);
+					resolve(result);
+				});
+			})
+		}
 	};
-}
-
-function createPiece(type) {
-	//3x3 or higher because you can't rotate with less
-	if (type === 'T') {
-		return [
-			[0, 0, 0],
-			[1, 1, 1],
-			[0, 1, 0]
-		];
-	}
-	else if (type === 'O') {
-		return [
-			[2, 2],
-			[2, 2]
-		];
-	}
-	else if (type === 'L') {
-		return [
-			[0, 3, 0],
-			[0, 3, 0],
-			[0, 3, 3]
-		];
-
-	}
-	else if (type === 'J') {
-		return [
-			[0, 4, 0],
-			[0, 4, 0],
-			[4, 4, 0]
-		];
-	}
-	else if (type === 'I') {
-		return [
-			[0, 5, 0, 0],
-			[0, 5, 0, 0],
-			[0, 5, 0, 0],
-			[0, 5, 0, 0]
-		];
-	}
-	else if (type === 'S') {
-
-		return [
-			[0, 6, 6],
-			[0, 6, 0],
-			[6, 6, 0]
-		];
-	}
-	else if (type === 'Z') {
-		return [
-			[7, 7, 0],
-			[0, 7, 7],
-			[0, 0, 0]
-		];
-	}
 }
 
 function Events() {
@@ -459,7 +430,6 @@ function Events() {
 	};
 }
 
-
 function Game(element, gameManager) {
 	if (dev) {
 		console.log('Starting game');
@@ -483,6 +453,9 @@ function Game(element, gameManager) {
 		context,
 		arena,
 		draw(game) {
+			if (!arena.matrix || !player.matrix)
+				return;
+
 			context.fillStyle = '#000';
 			context.fillRect(0, 0, canvas.width, canvas.height);
 			
@@ -508,6 +481,33 @@ function Game(element, gameManager) {
 					}
 				});
 			});
+		},
+		penalty(game) {
+			//Returns true if the size of the penalty wall increased otherwise false
+			//Temp is -1 and permanent is null
+			const matrix = arena.matrix;
+
+			for (let y = matrix.length - 1; y > 0; --y) {
+				if (matrix[y][0] === -1) {
+					matrix[y].fill(null);
+					return false;
+				}
+			}
+
+			//Create a temporary wall
+			const temp = matrix[0].slice(0).fill(-1);
+
+			matrix.push(temp);
+			game.draw(game);	//Render new changes
+
+			if (matrix[0].some(value => value !== 0)) {
+				//The pile reached past the starting point. Game over
+				gameManager.gameOver();
+				return true;
+			}
+			//Remove the top row
+			matrix.shift();
+			return true;
 		},
 		reset() {
 			arena.clear(arena);
@@ -739,6 +739,52 @@ function GameManager() {
 		removePlayer(player) {
 			removePlayer(player);
 		},
+		getPieceAtIndex(index) {
+			return new Promise((resolve, reject) => {
+				console.log('Validating...');
+
+
+				if (gameManager.getMode() !== 'multiplayer') {
+					reject('Multiplayer mode not enabled');
+					return;
+				}
+				else if (!connection) {
+					reject('Socket connection unavailable');
+					return;
+				}
+				else if (isNaN(index)) {
+					reject('Value is not an index');
+					return;
+				}
+
+				console.log('Validated! SENDING REQUEST');
+
+				const layout = connection.getSessionLayout();
+				const piece = layout[index];
+
+				if (piece) {
+					resolve(layout[index]);
+					connection.send({ type: 'new-piece' });
+					return;
+				}
+				reject('Piece unavailable');
+
+
+
+
+				// connection.sendAndAck({ type: 'new-piece' })
+				// .then(piece => {
+					// console.log('Received message: ', piece);
+
+					/*
+					if (piece)
+						resolve(piece);
+					else reject('Error');
+					*/
+				/*})
+				.catch(reject);*/
+			});
+		},
 		setMode(value) {
 			const modes = [null, '1-player', '2-player', 'multiplayer'];
 
@@ -769,6 +815,7 @@ function GameManager() {
 					isRunning = false;
 					return localPlayer;
 				default:
+					//Single player
 					localPlayer.run();
 					return;
 			}
@@ -781,12 +828,10 @@ function GameManager() {
 			if (gameManager.getMode() !== 'multiplayer') return;
 			if (gameManager.isRunning()) return;
 			
-			console.log('Session id: ');
-
-			connection.send({
+			connection.send({ 
 				type: 'start-game',
 				id: connection.getSessionId()
-			});
+			 });
 			return;
 		},
 		startNewGameLAN(gameManager) {
@@ -820,7 +865,7 @@ function Player(game, gameManager) {
 		console.log('New player joined');
 	}
 
-	const AUDIO = new Audio('assets/sound.mp3');
+	const pieces = 'ILJOTSZ';
 	const pos = {x: 0, y: 0};
 	const arena = game.arena;
 	const events = Events(); 
@@ -829,15 +874,97 @@ function Player(game, gameManager) {
 	let dropCounter = 0;	
 	let pieceCount = 0;
 
+	function createPiece(type) {
+		//3x3 or higher because you can't rotate with less
+		if (type === 'T') {
+			return [
+				[0, 1, 0],
+				[1, 1, 1],
+				[0, 0, 0]
+			];
+		}
+		else if (type === 'O') {
+			return [
+				[2, 2],
+				[2, 2]
+			];
+		}
+		else if (type === 'L') {
+			return [
+				[0, 0, 3],
+				[3, 3, 3],
+				[0, 0, 0]
+			];
+
+		}
+		else if (type === 'J') {
+			return [
+				[4, 0, 0],
+				[4, 4, 4],
+				[0, 0, 0]
+			];
+		}
+		else if (type === 'I') {
+			return [
+				[0, 0, 0, 0],
+				[5, 5, 5, 5],
+				[0, 0, 0, 0],
+				[0, 0, 0, 0]
+			];
+		}
+		else if (type === 'S') {
+
+			return [
+				[0, 6, 6],
+				[0, 6, 0],
+				[6, 6, 0]
+			];
+		}
+		else if (type === 'Z') {
+			return [
+				[7, 7, 0],
+				[0, 7, 7],
+				[0, 0, 0]
+			];
+		}
+	}
 
 	function onGameOver(player) {
 		const gameMode = gameManager.getMode();
+		
 		gameOver = true;
 		
 		if (game.isLocal || gameMode === '2-player') {
 			gameManager.gameOver();
 			gameManager.state = 'game-over';
 		}
+	}
+
+	function newPiece() {
+		return new Promise((resolve, reject) => {
+
+			if (gameManager.getMode() !== 'multiplayer') {
+				const piece = createPiece(pieces[pieces.length * Math.random() | 0]);
+
+				resolve(piece);
+				return;
+			}
+
+			console.log('Requesting piece');
+
+			gameManager.getPieceAtIndex(pieceCount)
+			.then(result => {
+				console.log('Server response: ', result);
+
+				resolve(createPiece(result));
+			})
+			.catch(e => {
+				console.log(e);
+				/*gameManager.gameOver(false);
+				gameManager.openMenu('error');*/
+				reject(e);
+			})
+		});
 	}
 
 	return {
@@ -854,6 +981,8 @@ function Player(game, gameManager) {
 		},
 		drop(player) {
 			if (gameOver) return;
+
+			const AUDIO = new Audio('assets/sound.mp3');
 
 			pos.y++;
 			dropCounter = 0;
@@ -911,6 +1040,7 @@ function Player(game, gameManager) {
 			arena.matrix.forEach(row => row.fill(0)); //Clean the arena
 			player.score = 0;
 			pieceCount = 0;
+			player.reset(player);
 		},
 
 		newPosition(value) {
@@ -927,34 +1057,52 @@ function Player(game, gameManager) {
 
 			if (gameOver) return;
 			
-			const pieces = 'ILJOTSZ';
-
 			//New piece should be provided by server
-			
-			/*if (gameManager.getMode() === 'multiplayer') {
-				fetchNewPiece()
-				.then(piece => {
-					player.matrix = piece;
-				})
-			}
-			else {*/
-				player.matrix = createPiece(pieces[pieces.length * Math.random() | 0]);
-			//}
-			pos.y = 0;
-			pos.x = (arena.matrix[0].length / 2 | 0) - (player.matrix[0].length / 2 | 0);
-			pieceCount++;
+			newPiece()
+			.then(piece => {
+				player.matrix = piece;
 
-			if (arena.collide(arena, player)) {
+				console.log('Piece ', piece);
+
+				//DEV
+				// return;
+
+
+
+
+
+				/*if (gameManager.getMode() === 'multiplayer') {
+					fetchNewPiece()
+					.then(piece => {
+						player.matrix = piece;
+					})
+				}
+				else {*/
+					// player.matrix = createPiece(pieces[pieces.length * Math.random() | 0]);
+
+					console.table('Assigned new piece: ', player.matrix);
+				//}
+				pos.y = 0;
+				pos.x = (arena.matrix[0].length / 2 | 0) - (player.matrix[0].length / 2 | 0);
+				pieceCount++;
+
+				if (arena.collide(arena, player)) {
+					//Game over
+					onGameOver(player);
+					// if ()
+
+					/*events.emit('game-over', {
+						score: player.score
+					});*/
+				}
+				events.emit('pos', pos);
+				events.emit('matrix', player.matrix);
+			})
+			.catch(e => {
 				//Game over
-				onGameOver(player);
-				// if ()
+				//
+			})
 
-				/*events.emit('game-over', {
-					score: player.score
-				});*/
-			}
-			events.emit('pos', pos);
-			events.emit('matrix', player.matrix);
 		},
 
 		rotate(player, dir) {

@@ -6,6 +6,7 @@ const Session = require('./session');
 const Client = require('./client');
 
 const PORT = process.env.PORT || 9000;
+const QUE_LIMIT = 5;
 
 const server = new WebSocketServer({port: PORT}, () => {
 	console.log('Socket listening on port ', PORT);
@@ -15,16 +16,40 @@ const logSessions = process.env.SESSION || false;
 
 const sessions = new Map();
 
+function broadcastSession(session) {
+	const clients = [...session.clients];
+
+	clients.forEach(client => {
+		client.send({
+			type: 'session-broadcast',
+			layout: session.pieceLayout,
+			peers: {
+				you: client.id,
+				clients: clients.map(client => {
+					return {
+						id: client.id,
+						name: client.name,
+						owner: client.id === session.owner,
+						playing: client.isPlaying,
+						score: client.score,
+						state: client.state,
+					};
+				}),
+			}
+		});
+	});
+}
+ 
+function createClient(conn, id=createId()) {
+	return new Client(conn, id);
+}
+
 function createId(len=6, chars='abcdefghjkmnopqrstwxyz0123456789') {
 	let id = '';
 	while (len--) {
 		id += chars[Math.random() * chars.length | 0];
 	}
 	return id;
-} 
-
-function createClient(conn, id=createId()) {
-	return new Client(conn, id);
 }
 
 function createName(name, session) {
@@ -57,35 +82,10 @@ function createSession(id=createId(), client, data) {
 		owner: client.id
 	});	//Send the room id and owner	
 
+
+	broadcastSession(session);
+
 	return session;
-}
-
-
-function getSession(id) {
-	return sessions.get(id);
-}
-
-function broadcastSession(session) {
-	const clients = [...session.clients];
-
-	clients.forEach(client => {
-		client.send({
-			type: 'session-broadcast',
-			peers: {
-				you: client.id,
-				clients: clients.map(client => {
-					return {
-						id: client.id,
-						name: client.name,
-						owner: client.id === session.owner,
-						playing: client.isPlaying,
-						score: client.score,
-						state: client.state
-					};
-				}),
-			}
-		});
-	});
 }
 
 function gameOver(data, client) {
@@ -116,6 +116,7 @@ function gameOver(data, client) {
 
 	if (dev) console.log(`${winner.name} is the winner.`);
 	session.isRunning = false;
+	session.pieceLayout = [];
 
 	winner.send({ type: 'game-winner' });
 
@@ -128,6 +129,10 @@ function gameOver(data, client) {
 	
 
 	//clients.broadcastSession(session, false, true);	//Game over property 
+}
+
+function getSession(id) {
+	return sessions.get(id);
 }
 
 function joinSession(data, client, data) {
@@ -157,6 +162,34 @@ function joinSession(data, client, data) {
 	broadcastSession(session);
 }
 
+function nextPiece(res, client) {
+	if (!client.isPlaying || !isString(client.session)) {
+		res(null);
+		return;
+	}
+	else if (!sessions.has(client.session)) {
+		res(null);
+		return;
+	}
+
+	const pieces = "IJLOSTZ";
+	const session = sessions.get(client.session);
+
+	client.pieces += 1;
+
+	if (isString(session.pieceLayout[client.pieces - 1])) {
+		res({
+			value: session.pieceLayout[client.pieces - 1],
+			count: client.pieces
+		});
+		return;
+	}
+	res({
+		value: session.addNewPiece(),
+		count: client.pieces
+	});
+}
+
 function startGame(data, client) {
 	if (!sessions.has(data.id)) {
 		throw new Error(`Session does not exist`);
@@ -165,11 +198,13 @@ function startGame(data, client) {
 	const session = getSession(data.id);
 	const clients = [...session.clients];
 
+	broadcastSession(session);
+
 	//DEV	
-	console.log('Session: ', session)
+	/*console.log('Session: ', session)
 	console.log('Client: ', client);
 	console.log('Compared ids: ', session.owner, client.id);
-	//ENDOF DEV
+	*///ENDOF DEV
 	if (session.owner !== client.id) {
 		client.send({
 			type: 'multiplayer-error',
@@ -186,6 +221,7 @@ function startGame(data, client) {
 	}
 
 	session.isRunning = true;
+	session.addNewPiece();
 	clients.forEach(client => {
 		client.isPlaying = true;
 		client.send({ type: 'start-game' });
@@ -198,7 +234,7 @@ server.on('connection', conn => {
 	}
 	const client = createClient(conn, createId());
 
-	conn.on('message', msg => {
+	conn.on('message', (msg) => {
 		if (dev) {
 			console.log('Message receieved', msg);
 		}
@@ -216,9 +252,20 @@ server.on('connection', conn => {
 		else if (data.type === 'game-over') {
 			gameOver(data, client);
 		}
+		else if (data.type === 'new-piece') {
+			client.pieces++;
+
+			/*console.log('Requesting next piece');
+			console.log('val: ', val);
+			console.log(callback);
+			//return;
+			res('Hello 123');
+*/
+			//nextPiece(res, client);
+		}
 		else if (data.type === 'state-update') {
 			const [prop, value] = data.state;
-
+	
 			if (prop === 'sweep') {
 				console.log('Punish other players');
 				client.broadcast({ type: 'penalty' });
@@ -227,8 +274,23 @@ server.on('connection', conn => {
 
 			//Update state of peer view
 			client.state[data.fragment][prop] = value;
-			client.broadcast(data);
+			client.broadcast(data);	
+			
 		}
+
+		if (sessions.has(client.session.id)) {
+			console.log('Broadcasting live');
+			const session = getSession(client.session.id);
+				
+			//Add new pieces if client reaches end of que in 5 drop
+			while ([...session.clients].some(client => client.pieces >= session.pieceLayout.length - 5)) {
+				console.log('Adding new piece');
+				session.addNewPiece();
+			}
+			broadcastSession(session);
+		}
+
+
 	/*	if (logSessions) {
 			console.log('Sessions ', sessions);
 		}*/
