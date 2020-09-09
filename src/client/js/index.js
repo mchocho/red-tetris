@@ -247,7 +247,7 @@ function connectionManager(gameManager) {
 
 			if (!peers.has(client.id)) {
 				//Adds new player to the game view
-				const player = gameManager.createPlayer(hidePeers);
+				const player = gameManager.createPlayer(gameManager, hidePeers);
 
 				player.unserialize(client.state)
 				peers.set(client.id, player);
@@ -673,7 +673,7 @@ function GameManager() {
 			if (connection)
 				connection.close();
 		},
-		createPlayer(hide=false) {
+		createPlayer(gameManager, hide=false) {
 			return createPlayer(gameManager, false, hide);
 		},
 		gameOver(menu=true) {
@@ -739,7 +739,7 @@ function GameManager() {
 		removePlayer(player) {
 			removePlayer(player);
 		},
-		getPieceAtIndex(index) {
+		getPieceAtIndex(gameManager, index) {
 			return new Promise((resolve, reject) => {
 				console.log('Validating...');
 
@@ -952,7 +952,7 @@ function Player(game, gameManager) {
 
 			console.log('Requesting piece');
 
-			gameManager.getPieceAtIndex(pieceCount)
+			gameManager.getPieceAtIndex(gameManager, pieceCount)
 			.then(result => {
 				console.log('Server response: ', result);
 
@@ -1494,6 +1494,6 @@ document.addEventListener('keydown', keyListener);
 document.addEventListener('keyup', keyListener); 
 document.addEventListener('mouseover', formListener);
 document.addEventListener('submit', formSubmit);
-//document.addEventListener('change', settingsListener);
+document.addEventListener('change', settingsListener);
 
 });

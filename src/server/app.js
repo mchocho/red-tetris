@@ -254,20 +254,13 @@ server.on('connection', conn => {
 		}
 		else if (data.type === 'new-piece') {
 			client.pieces++;
-
-			/*console.log('Requesting next piece');
-			console.log('val: ', val);
-			console.log(callback);
-			//return;
-			res('Hello 123');
-*/
-			//nextPiece(res, client);
 		}
 		else if (data.type === 'state-update') {
 			const [prop, value] = data.state;
 	
 			if (prop === 'sweep') {
-				console.log('Punish other players');
+				if (dev)
+					console.log('Punish other players');
 				client.broadcast({ type: 'penalty' });
 				return;
 			}
@@ -279,21 +272,16 @@ server.on('connection', conn => {
 		}
 
 		if (sessions.has(client.session.id)) {
-			console.log('Broadcasting live');
 			const session = getSession(client.session.id);
 				
 			//Add new pieces if client reaches end of que in 5 drop
 			while ([...session.clients].some(client => client.pieces >= session.pieceLayout.length - 5)) {
-				console.log('Adding new piece');
+				if (dev)
+					console.log('Adding new piece');
 				session.addNewPiece();
 			}
 			broadcastSession(session);
 		}
-
-
-	/*	if (logSessions) {
-			console.log('Sessions ', sessions);
-		}*/
 	});
 
 

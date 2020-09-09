@@ -144,73 +144,72 @@
 
 	<div class="modal main show">
 			<div class="modal-content">
-	<section class="menu">
-		<form id="main-menu">
-			<h2 id="articles">Red Tetris</h2>
+				<section class="menu">
+					<form id="main-menu">
+						<h2 id="articles">Red Tetris</h2>
 
-			<label>
-				<input type="radio" class="nes-radio" name="mode" value="multiplayer" />
-				<span>Multiplayer</span>
-			</label>
+						<label>
+							<input type="radio" class="nes-radio" name="mode" value="multiplayer" />
+							<span>Multiplayer</span>
+						</label>
 
-			<label>
-				<input type="radio" class="nes-radio" name="mode" value="1-player" checked />
-				<span>Single Player</span>
-			</label>
+						<label>
+							<input type="radio" class="nes-radio" name="mode" value="1-player" checked />
+							<span>Single Player</span>
+						</label>
 
-			<label>
-				<input type="radio" class="nes-radio" name="mode" value="2-player" />
-				<span>2 Players</span>
-			</label>
+						<label>
+							<input type="radio" class="nes-radio" name="mode" value="2-player" />
+							<span>2 Players</span>
+						</label>
 
-			
-			<label>
-				<input type="radio" class="nes-radio" name="mode" value="settings" />
-				<span>Settings</span>
-			</label>
+						
+						<label>
+							<input type="radio" class="nes-radio" name="mode" value="settings" />
+							<span>Settings</span>
+						</label>
 
-		</form>
-	</section>
+					</form>
+				</section>
 			</div>
 	</div>
 
-		<div class="modal multiplayer">
-			<div class="modal-content">
+	<div class="modal multiplayer">
+		<div class="modal-content">
+			<section class="menu">
+				<form id="start-game">
+					<h3>Game Room</h3>
+						
+					<div class="game-link">
+						<span class="url"></span>
+					</div>
 
-	<section class="menu">
-		<form id="start-game">
-			<h3>Game Room</h3>
-				
-			<div class="game-link">
-				<span class="url"></span>
-			</div>
+					<div class="player-list">
+						<h4>Player list</h4>
+						
+						<div class="lists">
+							<ul class="nes-list is-disc">
+								<li>
+									<span class="you"></span>
+									<span>(You)</span>
+								</li>
 
-			<div class="player-list">
-				<h4>Player list</h4>
-				
-				<div class="lists">
-					<ul class="nes-list is-disc">
-						<li>
-							<span class="you"></span>
-							<span>(You)</span>
-						</li>
+								<div class="alt-players"></div>
+							</ul>
+						</div>
+					</div>
 
-						<div class="alt-players"></div>
-					</ul>
-				</div>
-			</div>
+					<div class="error_message">
+						Shit... Something happened
+					</div>
 
-			<div class="error_message">
-				Shit... Something happened
-			</div>
-
-			<div>
-				<p class="cmd"></p>
-			</div>
-		</form>
-	</section>
-			</div>
+					<div>
+						<p class="cmd"></p>
+					</div>
+				</form>
+			</section>
 		</div>
+	</div>
 
 	<div class="modal pause">
 		<div class="modal-content">
@@ -227,63 +226,61 @@
 		</div>
 	</div>
 
-
-
 	<div class="modal settings">
 			<div class="modal-content">
-	<section class="menu">
-		<form id="settings">
-			<h2>Settings</h2>
+				<section class="menu">
+					<form id="settings">
+						<h2>Settings</h2>
 
-			<label>
-				<input type="checkbox" value="toggleSounds" class="nes-checkbox" checked />
-				<span>Enable sounds</span>
-			</label>
-	
-			<label>
-				<input type="checkbox" value="toggleColours" class="nes-checkbox" checked />
-				<span>Disable colours</span>
-			</label>
+						<label>
+							<input type="checkbox" value="toggleSounds" class="nes-checkbox" checked />
+							<span>Enable sounds</span>
+						</label>
+				
+						<label>
+							<input type="checkbox" value="toggleColours" class="nes-checkbox" checked />
+							<span>Disable colours</span>
+						</label>
 
-			<label>
-				<input type="checkbox" value="togglePeers" class="nes-checkbox" />
-				<span>Show peers game</span>
-			</label>
+						<label>
+							<input type="checkbox" value="togglePeers" class="nes-checkbox" />
+							<span>Show peers game</span>
+						</label>
 
-			<!--<label>
-				<input type="radio" class="nes-radio" name="mode" />
-				<span>Multiplayer</span>
-			</label>-->
+						<!--<label>
+							<input type="radio" class="nes-radio" name="mode" />
+							<span>Multiplayer</span>
+						</label>-->
 
-			<button type="submit" class="nes-btn is-primary">Continue</button>
-			
-		</form>
-	</section>
+						<button type="submit" class="nes-btn is-primary">Continue</button>
+						
+					</form>
+				</section>
 			</div>
 	</div>
 
 	<div class="modal game-over">
 			<div class="modal-content">
 
-	<section class="menu">
-		<form id="game-over">
-			<h2>Game over</h2>
+				<section class="menu">
+					<form id="game-over">
+						<h2>Game over</h2>
 
-			<div class="modal-content">
-				Play again
+						<div class="modal-content">
+							Play again
 
-				<label>
-					<input type="radio" class="nes-radio" name="try-again" value="Yes" checked/>
-					<span>Yes</span>
-				</label>
+							<label>
+								<input type="radio" class="nes-radio" name="try-again" value="Yes" checked/>
+								<span>Yes</span>
+							</label>
 
-				<label>
-					<input type="radio" class="nes-radio" name="try-again" value="No" />
-					<span>No</span>
-				</label>
-			</div>
-		</form>
-	</section>
+							<label>
+								<input type="radio" class="nes-radio" name="try-again" value="No" />
+								<span>No</span>
+							</label>
+						</div>
+					</form>
+				</section>
 			</div>
 	</div>
 
