@@ -5,9 +5,12 @@
 *.ghc
 *.stackdump
 .DS_Store
+build
+dist
 node_modules
+screenshots
 package-lock.json
-tests
+yarn.lock
 
 # local env files
 .env
@@ -15,6 +18,7 @@ tests
 .env.*.local
 
 # Log files
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

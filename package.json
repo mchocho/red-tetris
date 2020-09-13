@@ -1,0 +1,63 @@
+{
+  "name": "tetris",
+  "version": "0.0.7",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "react-test": "react-scripts test",
+    "eject": "react-scripts eject",
+    "webpack": "webpack",
+    "server": "nodemon src/server/app.js",
+    "client": "npm run build && npm run webpack && lite-server --baseDir=\"build\"",
+    "test": "jest --colors"
+  },
+  "keywords": [],
+  "author": "mchocho <mchocho@student.wethinkcode.co.za>",
+  "license": "ISC",
+  "dependencies": {
+    "@testing-library/jest-dom": "^4.2.4",
+    "@testing-library/react": "^9.5.0",
+    "@testing-library/user-event": "^7.2.1",
+    "cross-env": "^7.0.2",
+    "dotenv": "^8.2.0",
+    "lodash.isstring": "^4.0.1",
+    "nes.css": "^2.3.0",
+    "react": "^16.13.1",
+    "react-dom": "^16.13.1",
+    "react-scripts": "3.4.3",
+    "ws": "^7.3.1"
+  },
+  "devDependencies": {
+    "@babel/cli": "^7.11.6",
+    "@babel/core": "^7.11.6",
+    "@babel/plugin-transform-modules-commonjs": "^7.10.4",
+    "@babel/preset-env": "^7.11.5",
+    "babel-jest": "^24.9.0",
+    "babel-polyfill": "^6.26.0",
+    "babel-preset-react": "^6.24.1",
+    "canvas": "^2.6.1",
+    "css-loader": "^4.3.0",
+    "jest": "24.9.0",
+    "lite-server": "^2.5.4",
+    "nodemon": "^2.0.2",
+    "webpack": "^4.44.1",
+    "webpack-cli": "^3.3.12"
+  },
+  "eslintConfig": {
+    "extends": "react-app"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  }
+}
