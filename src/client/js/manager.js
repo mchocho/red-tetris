@@ -83,7 +83,7 @@ export default () => {
 		const element = document.createElement('div');
 
 		element.className = 'player';
-		element.innerHTML = `<canvas class="tetris" width="240" height="400"></canvas>`;
+		element.innerHTML = `<canvas class="tetris" width="180" height="400"></canvas>`;
 
 		const tetris = Game(element, gameManager);
 		const container = document.getElementById('players');

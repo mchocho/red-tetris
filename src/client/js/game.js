@@ -9,7 +9,7 @@ export default (element, gameManager) => {
 	}
 	const canvas = element.querySelector('canvas');
 	const context = canvas.getContext('2d');
-	let arena = Arena(13, 20);
+	let arena = Arena(10, 20);
 	const colours = [
 		null,
 		'red',
