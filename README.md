@@ -29,6 +29,7 @@ Open http://localhost:3000#<room\>[<player_name>] to view it in the browser.
 
   Where
   		room is the name of the game to create or join
+		<br />
   		player_name is the name of the player
 
 For example http://localhost:3000/#demo[mchocho] 
