@@ -7,6 +7,7 @@
 
 - [Install](#install)
 - [Preview](#preview)
+- [Tests](#tests)
 
 ### `Install`
 
@@ -43,3 +44,12 @@ For example http://localhost:3000/#demo[mchocho]
 	<img width="80%" src="./screenshots/room-menu.png" alt="Multiplayer startup room"/>
 	<img width="80%" src="./screenshots/multiplayer.png" alt="Multiplayer game"/>
 </div>
+
+### `Tests`
+
+To run tests
+
+```bash
+cd /tests
+npm test filename (e.g game.class.test)
+```

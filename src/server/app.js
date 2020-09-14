@@ -14,7 +14,6 @@ const sessions 					= new Map();
 
 const io = new WebSocketServer({port: PORT}, () => {
 	console.log('Socket listening on port', PORT);
-	console.log('Open a new window and run npm run client.');
 });
 
 io.on('connection', conn => {

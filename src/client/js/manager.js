@@ -157,7 +157,7 @@ export default () => {
 		game.player.gameOver();
 		instances.delete(game);
 
-		if (!game.hidden)
+		if (!game.hidden && container)
 			container.removeChild(game.element);
 	}
 
@@ -330,8 +330,9 @@ export default () => {
 		setMode(value='1-player') {
 			const modes = [null, '1-player', '2-player', 'multiplayer'];
 
-			if (modes.indexOf(value) > -1)
+			if (modes.indexOf(value) > -1) {
 				mode = value;
+			}
 		},
 		startNewGame(gameManager) {
 			isRunning = true;
@@ -339,12 +340,6 @@ export default () => {
 
 			layout.splice(0, layout.length);
 			removeAllPlayers();
-
-			if (mode === '2-player') {
-				//Add initial piece
-				layout.push();
-			}
-
 
 			const localPlayer = createPlayer(gameManager, true);
 			let player2;
@@ -358,11 +353,8 @@ export default () => {
 					player2 = createPlayer(gameManager);
 					player2.player.setName('Player 2');
 
-					console.log('About to run game');
 					localPlayer.run(localPlayer);
 					player2.run(player2);
-
-					console.log('STARTED RUNNING');
 					break;
 				case 'multiplayer':
 					gameManager.openMenu('loading');
@@ -374,7 +366,32 @@ export default () => {
 					return;
 			}
 		},
+		startNewGameLAN(gameManager) {
+			if (!connection)
+				return;
+			
+			if (!connection.isConnected()) {
+				gameManager.openMenu('error');
+				return;
+			}
+			if (gameManager.getMode() !== 'multiplayer' || gameManager.isRunning())
+				return;
+
+			const game = [...instances][0];
+
+			game.reset();
+			closeMenus();
+			isRunning = true;
+			gameOver = false;
+
+			//There's a bug, on replay instances is undefined
+			game.player.newGame(game.player);
+			game.run(game);
+		},
 		startSession(gameManager) {
+			if (!connection)
+				return;
+
 			if (!connection.isConnected()) {
 				gameManager.openMenu('error');
 				return;
@@ -387,27 +404,6 @@ export default () => {
 				id: connection.getSessionId()
 			 });
 			return;
-		},
-		startNewGameLAN(gameManager) {
-			if (!connection.isConnected()) {
-				gameManager.openMenu('error');
-				return;
-			}
-			if (gameManager.getMode() !== 'multiplayer') return;
-			if (gameManager.isRunning()) {
-				return;
-			}
-
-			const game = [...instances][0];
-
-			game.reset();
-			closeMenus();
-			isRunning = true;
-			gameOver = false;
-
-			//There's a bug, on replay instances is undefined
-			game.player.newGame(game.player);
-			game.run(game);
 		},
 		totalPlayers() {
 			if (connection)

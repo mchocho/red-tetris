@@ -19,16 +19,13 @@ export default (w, h) => {
 	}
 
 	function penalizeOpponent(player, gameManager) {
+		//Penalise player on local game
 		const players = [...gameManager.instances];
 
-		if (player.game.isLocal) {
-			//Penalise player 2
+		if (player.game.isLocal)
 			players[1].penalty(players[1]);
-		}
-		else {
-			//Penalise player 1
+		else
 			players[0].penalty(players[0]);
-		}
 	}
 	
 	return {
@@ -86,28 +83,27 @@ export default (w, h) => {
 			});
 		},
 
-		sweep(/*arena, */player, gameManager) {
+		sweep(player, gameManager) {
 			//Collects the game rows
 			let rowCount = 1;
 
 			outer:
-			for (let y = /*arena.*/matrix.length - 1; y > 0; --y) { //Started from the bottom
-				for (let x = 0; x < /*arena*/matrix[y].length; ++x) {
+			for (let y = matrix.length - 1; y > 0; --y) { //Started from the bottom
+				for (let x = 0; x < matrix[y].length; ++x) {
 					//Check if any rows have a 0 or null; meaning it's not fully populated
 					if ([0, -1, null].indexOf(matrix[y][x]) > -1) {
 						continue outer;	//Continue on next row
-						//labels: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/label
 					}
 				}
 
 				//Perfect row. remove row from arena
-				const row = /*arena*/matrix.splice(y, 1)[0].fill(0); //After remove, copy and zero fill
-				/*arena*/matrix.unshift(row);	//Throw row ontop of arena 
-				++y;			//Offset y position
+				const row = matrix.splice(y, 1)[0].fill(0); //After remove, copy and zero fill
+				
+				matrix.unshift(row);						//Throw row ontop of arena 
+				++y;										//Offset y position
 
 				player.setScore(player.getScore() + rowCount * 10)
-				// player.score += rowCount * 10;
-				rowCount *= 2;		//For every row doublw score
+				rowCount *= 2;
 				events.emit('matrix', matrix);
 				events.emit('sweep', true);
 

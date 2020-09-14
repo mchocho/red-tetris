@@ -1,4 +1,4 @@
-const dev = true;
+const dev = false;
 
 export default (gameManager) => {
 	const peers = new Map();
@@ -6,7 +6,7 @@ export default (gameManager) => {
 	let connection = null;
 	let id = null;
 	let layout = [];
-	let activePlayers = 1;
+	let activePlayers = 0;
 	let totalPlayers = 1;
 
 	function getSessionId() {

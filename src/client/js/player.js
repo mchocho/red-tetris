@@ -26,7 +26,8 @@ export default (game, gameManager) => {
 		const gameMode = gameManager.getMode();
 		
 		gameOver = true;
-		
+		player.setScore(0);
+
 		if (game.isLocal || gameMode === '2-player') {
 			gameManager.gameOver();
 			gameManager.state = 'game-over';
@@ -262,7 +263,7 @@ export default (game, gameManager) => {
 			return slow;
 		},
 
-		update(player, deltaTime,) {
+		update(player, deltaTime) {
 			if (paused || gameOver) return;
 
 			dropCounter += deltaTime;
@@ -286,11 +287,12 @@ export default (game, gameManager) => {
 			if (tileAvailable) {
 				//Check tiles above and below
 				if (player.move(player, 1, 'y', emit)) {
+					//There was no collision this isn't a hole
 					player.move(player, -1, 'y', emit);
 					player.move(player, dir * -1, emit);
 					return false;
 				}
-				else if (player.move(player, -1, 'y', emit)) {
+				if (player.move(player, -1, 'y', emit)) {
 					player.move(player, 1, 'y', emit);
 					player.move(player, dir * -1, emit);
 					return false;

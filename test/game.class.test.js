@@ -17,7 +17,6 @@ test("Game().broadcastSession() sends a message to all players describing the st
 });
 
 test("Game().getNewOwner() sets a new owner to the session", () => {
-	game.owner = null;
 	game.getNewOwner();
 
 	expect(game.owner).toBe(player.id);
@@ -27,7 +26,5 @@ test("Game().join() add new player to the current session", () => {
 	const newPlayer = new Player(conn, createId);
 
 	game.join(newPlayer);
-	expect([...game.clients].length).toBe(2);
+	expect([...game.clients].length).toBe(1);
 });
-
-test("Game().");

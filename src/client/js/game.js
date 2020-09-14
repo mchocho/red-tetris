@@ -95,7 +95,10 @@ export default (element, gameManager) => {
 			const localPlayerEl	= document.querySelector('#game .player-list .you');
 			const playerList 	= document.querySelector('#game .alt-players');
 			const countEl 		= document.getElementById('player-count');
-			const mode 			= gameManager.getMode();			
+			const mode 			= gameManager.getMode();	
+
+			if (!localPlayerEl || !playerList || !countEl)
+				return;
 
 			if (mode === '1-player')
 				countEl.textContent = 'Single player';

@@ -6,8 +6,6 @@ export default (gameManager) => {
 
 		const tagName = el.tagName.toLowerCase();
 
-		console.log(tagName);
-
 		if (tagName === 'form') {
 			el.focus();
 		}
@@ -24,8 +22,6 @@ export default (gameManager) => {
 	}
 
 	return (event) => {
-		console.log(event);
-
 		if (event.type === 'submit') 
 			event.preventDefault();
 

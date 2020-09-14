@@ -5,8 +5,8 @@ const path = require('path');
 module.exports = {
     devtool: 'inline-source-map',
     devServer: {
-        contentBase: path.join(__dirname, '/public'), // where dev server will look for static files, not compiled
-        publicPath: './build' //relative path to output path where  devserver will look for compiled files
+        contentBase: path.join(__dirname, '/public'),
+        publicPath: './build'
     },
     entry: {
         app: ['./src/client/App.js']
@@ -19,7 +19,7 @@ module.exports = {
     resolve: {
         extensions: ['*', '.js', '.jsx'],
         alias: {
-             '@': path.resolve(__dirname, 'src') // shortcut to reference src folder from anywhere
+             '@': path.resolve(__dirname, 'src')
          }
     },
     module: {
@@ -31,12 +31,8 @@ module.exports = {
             },
             {
                 test: /\.css$/,
-                // exclude: /node_modules/,
                 loaders: ['css-loader']
             }
         ]
-    }/*,
-    plugins: [
-        new webpack.optimize.UglifyJsPlugin()
-    ]*/
+    }
 }

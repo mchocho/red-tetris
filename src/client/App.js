@@ -14,7 +14,6 @@ import Controls from './components/controls';
 import Settings from './components/settings'; 
 import GameManager from './js/manager';
 
-
 function App() {
   window.DEV = true;
   window.EVENTS = true;
