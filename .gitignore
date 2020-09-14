@@ -8,7 +8,6 @@
 build
 dist
 node_modules
-screenshots
 package-lock.json
 yarn.lock
 

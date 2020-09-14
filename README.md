@@ -11,8 +11,6 @@
 
 ### `Install`
 
-<h2 align="center">Install</h2>
-
 Download and install <a href="https://nodejs.org/en/">Node.js</a>
 
 Then open your terminal and run
