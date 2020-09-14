@@ -36,11 +36,11 @@ For example http://localhost:3000/#demo[mchocho]
 ### `Preview`
 
 <div align="center">
-	<img width="80%" src="./screenshots/main.png" alt="Game main menu"/>
-	<img width="80%" src="./screenshots/controls.png" alt="Game controls menu"/>
-	<img width="80%" src="./screenshots/single-player.png" alt="Single player game"/>
-	<img width="80%" src="./screenshots/room-menu.png" alt="Multiplayer startup room"/>
-	<img width="80%" src="./screenshots/multiplayer.png" alt="Multiplayer game"/>
+	<img width="80%" src="https://i.imgur.com/KuWl2Oo.png" alt="main menu"/>
+	<img width="80%" src="https://i.imgur.com/inBuaMk.png" alt="Game controls menu"/>
+	<img width="80%" src="https://i.imgur.com/AO2gAFR.png" alt="Single player game"/>
+	<img width="80%" src="https://i.imgur.com/uYZFVIu.png" alt="Multiplayer waiting room"/>
+	<img width="80%" src="https://i.imgur.com/UJrzgdh.png" alt="Multiplayer game"/>
 </div>
 
 ### `Tests`
