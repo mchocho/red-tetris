@@ -10,7 +10,7 @@
     "eject": "react-scripts eject",
     "webpack": "webpack",
     "server": "nodemon src/server/app.js",
-    "client": "npm run build && npm run webpack && lite-server --baseDir=\"build\"",
+    "client": "cross-env SKIP_PREFLIGHT_CHECK=\"true\" npm run build && npm run webpack && lite-server --baseDir=\"build\"",
     "test": "jest --colors"
   },
   "keywords": [],
