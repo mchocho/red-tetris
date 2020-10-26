@@ -18,16 +18,19 @@ class Game {
 		return piece.addNewPiece(this.pieceLayout);
 	}
 
-	broadcastSession() {
+	broadcastSession()
+	{
 		const clients = [...this.clients];
 
-		clients.forEach(client => {
+		clients.forEach(client =>
+		{
 			client.send({
 				type: 'session-broadcast',
 				layout: this.pieceLayout,
 				peers: {
 					you: client.id,
-					clients: clients.map(client => {
+					clients: clients.map(client =>
+					{
 						return {
 							id: client.id,
 							name: client.name,
@@ -42,17 +45,18 @@ class Game {
 		});
 	}
 
-	getNewOwner() {
+	getNewOwner()
+	{
 		const clients = [...this.clients];
 
-		if (clients.some(client => client.id !== this.owner)) {
+		if (clients.some(client => client.id !== this.owner))
+		{
 			const client = clients[0];
 
 			this.owner = client.id;
 
-			if (DEV) {
+			if (DEV)
 				console.log('New game room owner is ', client.name);
-			}
 
 			client.send({type: 'owner-permissions'});
 
@@ -66,9 +70,9 @@ class Game {
 	join(client)
 	{
 		//Connects client to a session
-		if (client.session) {
+		if (client.session)
 			throw new Error('Client already in session');
-		}
+
 		this.clients.add(client);
 		client.session = this;
 	}
@@ -76,15 +80,12 @@ class Game {
 	leave(client)
 	{
 		//Removes client from session
-		if (client.session !== this) {
+		if (client.session !== this)
 			throw new Error('Client not in session');
-		}
+
 		this.clients.delete(client);
 		client.session = null;
 	}
-
-	
-	
 }
 
 module.exports = Game;

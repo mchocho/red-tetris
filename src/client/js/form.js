@@ -1,27 +1,34 @@
-export default (gameManager) => {
-	const formListener = (event) => {
+export default (gameManager) =>
+{
+	const formListener = (event) =>
+	{
 		const el = event.target;
 
-		if (!el) return;
+		if (!el)
+			return;
 
 		const tagName = el.tagName.toLowerCase();
 
-		if (tagName === 'form') {
+		if (tagName === 'form')
 			el.focus();
-		}
-		if (tagName === 'input' && el.type === 'radio') {
+		
+		if (tagName === 'input' && el.type === 'radio')
 			el.checked = true;
-		}
-		if (tagName === 'label' && el.firstElementChild) {
+		
+		if (tagName === 'label' && el.firstElementChild)
+		{
 			const firstChild = el.firstElementChild;
 
 			if (firstChild.tagName.toLowerCase() === 'input' && firstChild.type === 'radio')
+			{
 				firstChild.focus();
 				firstChild.click();
+			}
 		}
 	}
 
-	return (event) => {
+	return (event) =>
+	{
 		if (event.type === 'submit') 
 			event.preventDefault();
 

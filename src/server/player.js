@@ -6,53 +6,60 @@ const { createId, getSession } 	= require('./util');
 
 const DEV = process.env.DEV || false;
 
-class Player {
-	constructor(conn, id) {
-		this.conn 		= conn;       //Store the clients connection
+class Player
+{
+	constructor(conn, id)
+	{
+		this.conn 		= conn;
 		this.id 		= id;
 		this.pieces 	= 0;
 		this.score 		= 0;
 		this.isPlaying 	= false;
 		this.name 		= null;
-		this.session 	= null;    //Session the client will live in
+		this.session 	= null;
 		this.state 		= null;
 	}
 
-	broadcast(data) {
-		if (!this.session) {
+	broadcast(data)
+	{
+		if (!this.session)
 			throw new Error('Can not broadcast without session');
-		}
 
 		data.clientId = this.id;
 
-		this.session.clients.forEach(client => {
-			if (this === client) {
-				return; //We don't need to broadcast to ourself
-			}
+		this.session.clients.forEach(client =>
+		{
+			if (this === client)
+				return;
 			client.send(data);
 		});
 	}
 
-	createName(name, session) {
-		console.log('Received name', name);
+	createName(name, session)
+	{
+		if (DEV)
+			console.log('Received name', name);
+		
 		if (isString(name))
 			if (name.trim().length > 3)
-				if (![...session.clients].some(client => client.name === name.trim())) {
+				if (![...session.clients].some(client => client.name === name.trim()))
+				{
 					this.name = name.trim();
 					return;
 				}
 		this.name = `user-${createId()}`;
 	}
 
-	createSession(id=createId(), sessions, data) {
-		if (sessions.has(id)) {
+	createSession(id=createId(), sessions, data)
+	{
+		if (sessions.has(id))
 			throw new Error(`Game ${id} already exists`);
-		}
 
 		const session = new Game(id, this);
-		if (DEV) {
+		
+		if (DEV)
 			console.log('Creating session', session);
-		}
+
 		sessions.set(id, session);			//Add session to list
 		this.createName(data.name, session);
 		session.join(this);				//Add client to game room
@@ -64,21 +71,22 @@ class Player {
 			id: session.id,
 			name: this.name,
 			owner: this.id
-		});	//Send the room id and owner	
-
+		});
 
 		session.broadcastSession();
 
 		return session;
 	}
 
-	gameOver(sessions, data) {
-		if (!sessions.has(data.id)) {
-			if (DEV) {
+	gameOver(sessions, data)
+	{
+		if (!sessions.has(data.id))
+		{
+			if (DEV)
 				console.log('Game does not exist');
-			}
 			return;
 		}
+
 		const session = getSession(sessions, data.id);
 
 		this.isPlaying = false;
@@ -87,18 +95,19 @@ class Player {
 		const playersLeft = [...session.clients].filter(client => client.isPlaying);
 		let winner;
 
-		if (playersLeft.length === 1) {
+		if (playersLeft.length === 1)
+		{
 			playersLeft[0].isPlaying = false;
 			winner = playersLeft[0];
 		}
-		else if (playersLeft.length === 0) {
+		else if (playersLeft.length === 0)
 			winner = this;
-		}
-		else {
-			return;		//The game is still on
-		}
+		else
+			return;		//The game is still running
 
-		if (DEV) console.log(`${winner.name} is the winner.`);
+		if (DEV)
+			console.log(`${winner.name} is the winner.`);
+		
 		session.isRunning = false;
 		session.pieceLayout = [];
 
@@ -112,8 +121,10 @@ class Player {
 		return;
 	}
 
-	joinSession(sessions, data) {
-		if (!sessions.has(data.id)) {
+	joinSession(sessions, data)
+	{
+		if (!sessions.has(data.id))
+		{
 			//Game room hasn't been created
 			this.createSession(data.id, sessions, data);
 			return;
@@ -127,36 +138,38 @@ class Player {
 		this.state = data.state;
 
 		this.send({
-			type: 'session-join',
-			id: session.id,
-			name: this.name
+			type	: 'session-join',
+			id 		: session.id,
+			name 	: this.name
 		});
 
 		session.broadcastSession();
 	}
 
-	send(data) {
+	send(data)
+	{
 		const msg = JSON.stringify(data);
 
-		if (DEV) {
+		if (DEV)
 			console.log(`Sending message ${msg}`);
-		}
-		this.conn.send(msg, function ack(err) {
-			if (err && DEV) {
+
+		this.conn.send(msg, function ack(err)
+		{
+			if (err && DEV)
 				console.error('Message failed. ', msg, err);
-			}
 		});
 	}
 
-	startGame(sessions, data) {
-		if (!sessions.has(data.id)) {
+	startGame(sessions, data)
+	{
+		if (!sessions.has(data.id))
 			throw new Error(`Game does not exist`);
-		}
 
 		const session = getSession(sessions, data.id);
 		session.broadcastSession();
 
-		if (session.owner !== this.id) {
+		if (session.owner !== this.id)
+		{
 			this.send({
 				type: 'multiplayer-error',
 				message: 'Waiting for the room owner'
@@ -164,10 +177,11 @@ class Player {
 			return;
 		}
 
-		if (session.isRunning) {
-			if (DEV) {
+		if (session.isRunning)
+		{
+			if (DEV)
 				console.log('Game is still being played');
-			}
+
 			this.send({
 				type: 'multiplayer-error',
 				message: 'Game is still being played'
@@ -181,7 +195,8 @@ class Player {
 		session.addNewPiece();
 
 		//Broadcast start gane messaage
-		clients.forEach(client => {
+		clients.forEach(client =>
+		{
 			client.isPlaying = true;
 			client.send({ type: 'start-game' });
 		});

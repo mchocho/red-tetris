@@ -8,7 +8,8 @@ class Piece {
 		// this.pieceLayout 	= [];
 	}
 
-	addNewPiece(layout) {
+	addNewPiece(layout)
+	{
 		//Adds new random piece to tetrmonio list
 		const pieces = 'ILJOTSZ';
 		const index = pieces.length * Math.random() | 0;

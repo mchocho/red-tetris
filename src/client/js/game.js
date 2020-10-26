@@ -4,13 +4,12 @@ import Player from './player';
 const dev = window.DEV;
 
 export default (element, gameManager) => {
-	if (dev) {
+	if (dev)
 		console.log('Starting game');
-	}
-	const canvas = element.querySelector('canvas');
-	const context = canvas.getContext('2d');
-	let arena = Arena(10, 20);
-	const colours = [
+
+	const 	canvas 		= element.querySelector('canvas');
+	const 	context 	= canvas.getContext('2d');
+	const 	colours 	= [
 		null,
 		'red',
 		'blue',
@@ -20,12 +19,18 @@ export default (element, gameManager) => {
 		'orange',
 		'pink'
 	];
+	
+	let 	arena 		= Arena(10, 20);
+	let 	player 		= null;
+	let 	lastTime 	= 0;
+
 	const game = {
-		element,		//Unnecesary property
-		canvas,			//Unnecesary property
-		context,		//Unnecesary property
+		element,		//Unused property
+		canvas,			//Unused property
+		context,		//Unused property
 		arena,
-		draw(game) {
+		draw(game)
+		{
 			if (!arena.matrix || !player.matrix || !gameManager.isRunning())
 				return;
 
@@ -36,31 +41,35 @@ export default (element, gameManager) => {
 			game.drawMatrix(arena.matrix, {x: 0, y: 0});
 			game.drawMatrix(player.matrix, player.pos);
 		},
-		drawMatrix(matrix, offset) {
+		drawMatrix(matrix, offset)
+		{
 			const useColours = gameManager.enableColours;
 
-			matrix.forEach((row, y) => {
-				row.forEach((value, x) => {
-					if (value !== 0) {
+			matrix.forEach((row, y) =>
+			{
+				row.forEach((value, x) =>
+				{
+					if (value !== 0)
+					{
 						if (value === null)
 							context.fillStyle = 'white';	//Permanent wall
 						else if (value === -1)
 							context.fillStyle = 'grey';		//Breakable wall
 						else
 							context.fillStyle = useColours ? colours[value] : 'red';
-						context.fillRect(x + offset.x,
-								y + offset.y,
-						 		1, 1);
+						
+						context.fillRect(x + offset.x, y + offset.y, 1, 1);
 					}
 				});
 			});
 		},
-		penalty(game) {
+		penalty(game)
+		{
 			//Returns true if the size of the penalty wall increased otherwise false
-			//Temp is -1 and permanent is null
 			const matrix = arena.matrix;
 
-			for (let y = matrix.length - 1; y > 0; --y) {
+			for (let y = matrix.length - 1; y > 0; --y)
+			{
 				if (matrix[y][0] === -1) {
 					matrix[y].fill(null);
 					return false;
@@ -71,9 +80,10 @@ export default (element, gameManager) => {
 			const temp = matrix[0].slice(0).fill(-1);
 
 			matrix.push(temp);
-			game.draw(game);	//Render new changes
+			game.draw(game);
 
-			if (matrix[0].some(value => value !== 0)) {
+			if (matrix[0].some(value => value !== 0))
+			{
 				//The pile reached past the starting point. Game over
 				gameManager.gameOver();
 				return true;
@@ -82,14 +92,41 @@ export default (element, gameManager) => {
 			matrix.shift();
 			return true;
 		},
-		reset() {
+		reset()
+		{
 			arena.clear(arena);
 		},
-		run(game) {
+		run(game)
+		{
 			update();
 			game.updatePanel();
 		},
-		updatePanel() {
+		serialize(game)
+		{
+			return {
+				arena: {
+					matrix: game.arena.matrix
+				},
+				player: {
+					matrix: game.player.matrix,
+					pos: game.player.pos,
+					score: game.player.score
+				}
+			};
+		},
+		unserialize(state)
+		{
+			if (dev) {
+				console.log('Unserialized arena: ', state.arena);
+			}
+
+			arena.setMatrix(state.arena.matrix);
+			game.player.newPosition(state.player);
+			game.updatePanel();
+			game.draw(game);
+		},
+		updatePanel()
+		{
 			const players 		= [...gameManager.instances];
 			const localPlayer 	= players.shift();
 			const localPlayerEl	= document.querySelector('#game .player-list .you');
@@ -107,13 +144,15 @@ export default (element, gameManager) => {
 			else
 				countEl.textContent = `Players ${gameManager.activePlayers()} / ${gameManager.totalPlayers()}`;
 
-			localPlayerEl.innerHTML = `<li>
-											<span class="name">${localPlayer.player.getName()}</span>
-											${(mode !== '2-player') ? '<div class="indicator"></div>' : ''}
-											<span class="score">${localPlayer.player.getScore()}</span>
-										</li>`;
+			localPlayerEl.innerHTML =
+			`<li>
+				<span class="name">${localPlayer.player.getName()}</span>
+				${(mode !== '2-player') ? '<div class="indicator"></div>' : ''}
+				<span class="score">${localPlayer.player.getScore()}</span>
+			</li>`;
 			
 			playerList.innerHTML = '';
+
 			players.forEach((game, index) => {
 				const player = game.player;
 				const content 	= `<li>
@@ -126,14 +165,22 @@ export default (element, gameManager) => {
 
 		}
 	};
-	let player = Player(game, gameManager);
-	let lastTime = 0;
 
-	function update(time = 0) {
+	player = Player(game, gameManager);
+
+	context.scale(18, 20);
+	player.reset(player);
+	player.addListener('score', score =>
+	{
+		game.updatePanel();
+	});
+	game.player = player;
+
+	function update(time = 0)
+	{
 		//We need to make this reusable
-		if (!gameManager.isRunning()) {
+		if (!gameManager.isRunning())
 			return;
-		}
 
 		const deltaTime = time - lastTime;
 
@@ -143,37 +190,6 @@ export default (element, gameManager) => {
 		game.draw(game);
 		requestAnimationFrame(update);
 	}
-
-	context.scale(18, 20);
-	player.reset(player);
-	game.player = player;	//Maybe an array
-
-	game.serialize = function(game) {
-		return {
-			arena: {
-				matrix: game.arena.matrix
-			},
-			player: {
-				matrix: game.player.matrix,
-				pos: game.player.pos,
-				score: game.player.score
-			}
-		};
-	};
-
-	game.unserialize = function(state) {
-		if (dev) {
-			console.log('Unserialized arena: ', state.arena);
-		}
-		arena.setMatrix(state.arena.matrix);
-		game.player.newPosition(state.player);
-		game.updatePanel();
-		game.draw(game);
-	}
-	
-	player.addListener('score', score => {
-		game.updatePanel();
-	});
 	
 	return game;
 }

@@ -1,43 +1,49 @@
 import Events from './events';
 
-const DEV = window.DEV;
-const AUDIO = new Audio('./assets/sound.mp3');
+const 		DEV 			= window.DEV;
+const	 	AUDIO 			= new Audio('./assets/sound.mp3');
 
-export default (game, gameManager) => {
-	if (DEV) {
+export default (game, gameManager) =>
+{
+	if (DEV)
 		console.log('New player joined');
-	}
 
-	const pieces 		= gameManager.getPiecesList();
-	const pos 			= {x: 0, y: 0};
-	const arena 		= game.arena;
-	const events 		= Events();
-	const slow 			= 1000;
-	const fast 			= 50;
+	const 	pieces 			= gameManager.getPiecesList();
+	const 	pos 			= {x: 0, y: 0};
+	const 	arena 			= game.arena;
+	const 	events 			= Events();
+	const 	slow 			= 1000;
+	const 	fast 			= 50;
 	
-	let name 			= null;
-	let gameOver 		= false;
-	let paused 			= false;
-	let dropCounter 	= 0;
-	let pieceCount 		= 0;
-	let score 			= 0;
+	let 	name 			= null;
+	let 	gameOver 		= false;
+	let 	paused 			= false;
+	let 	dropInterval 	= 1000
+	let 	dropCounter 	= 0;
+	let 	pieceCount 		= 0;
+	let 	score 			= 0;
 
-	function onGameOver(player) {
+	function onGameOver(player)
+	{
 		const gameMode = gameManager.getMode();
 		
 		gameOver = true;
 		player.setScore(0);
 
-		if (game.isLocal || gameMode === '2-player') {
+		if (game.isLocal || gameMode === '2-player')
+		{
 			gameManager.gameOver();
 			gameManager.state = 'game-over';
 		}
 	}
 
-	function newPiece() {
-		return new Promise((resolve, reject) => {
+	function newPiece()
+	{
+		return new Promise((resolve, reject) =>
+		{
 
-			if (gameManager.getMode() === '1-player') {
+			if (gameManager.getMode() === '1-player')
+			{
 				const random = gameManager.createRandomPiece();
 
 				resolve(random);
@@ -45,10 +51,12 @@ export default (game, gameManager) => {
 			}
 
 			gameManager.getPieceAtIndex(gameManager, pieceCount)
-			.then(result => {
+			.then(result =>
+			{
 				resolve(gameManager.createPiece(result));
 			})
-			.catch(e => {
+			.catch(e =>
+			{
 				reject(e);
 			});
 		});
@@ -60,17 +68,23 @@ export default (game, gameManager) => {
 		pos,
 		matrix: null,
 		dropInterval: 1000, 	//Every 1 second we want to drop a piece
-		addListener(name, callback) {
+		addListener(name, callback)
+		{
+			//Custom listener
 			events.listen(name, callback);
 		},
-		drop(player) {
+		drop(player)
+		{
 			if (paused || gameOver) return;
 
 			pos.y++;
 			dropCounter = 0;
-			if (arena.collide(arena, player)) {
+
+			if (arena.collide(arena, player))
+			{
 				if (gameManager.enableSound)
 					AUDIO.play();
+
 				pos.y--;
 				arena.merge(arena.matrix, player);
 				player.reset(player);
@@ -81,66 +95,73 @@ export default (game, gameManager) => {
 			}
 			events.emit('pos', pos);
 		},
-
-		dropPieceInPile(player) {
+		dropPieceInPile(player)
+		{
 			if (paused || gameOver) return;
 
-			while(!arena.collide(arena, player)) {
+			while(!arena.collide(arena, player))
 				pos.y++;
-			}
+
 			player.move(player, -1, 'y');
 			player.drop(player);
 		},
-
-		fast() {
+		fast()
+		{
 			return fast;
 		},
-
-		gameOver() {
+		gameOver()
+		{
 			gameOver = true;
 		},
-
-		getName() {
+		getDropInterval()
+		{
+			return dropInterval;
+		},
+		getName()
+		{
 			return name;
 		},
-
-		getPieceCount() {
+		getPieceCount()
+		{
 			return pieceCount;
 		},
-
-		getScore() {
+		getScore()
+		{
 			return score;
 		},
-
-		isPaused() {
+		isPaused()
+		{
 			return paused;
 		},
-
-		move(player, dir, axis='x', emit=true) {
+		move(player, value, axis='x', emit=true)
+		{
 			if (paused || gameOver) return;
 
 			//Return true if no collision was detected otherwise false
-			pos[axis] += dir;
+			pos[axis] += value;
 
-			if (arena.collide(arena, player)) {
-				pos[axis] -= dir;
+			if (arena.collide(arena, player))
+			{
+				pos[axis] -= value;
 				return false;
 			}
+
 			if (emit)
 				events.emit('pos', pos);
 			return true;
 		},
-
-		newGame(player) {
+		newGame(player)
+		{
 			score 		= 0;
 			pieceCount 	= 0;
 			gameOver 	= false;
 			paused 		= false;
+
 			arena.matrix.forEach(row => row.fill(0)); //Clean the arena
 			player.reset(player);
 		},
-
-		newPosition(value) {
+		newPosition(value)
+		{
 			if (paused || gameOver) return;
 			if (!value) return;
 			if (isNaN(value.x) || isNaN(value.y)) return;
@@ -148,8 +169,8 @@ export default (game, gameManager) => {
 			pos.x = value.x;
 			pos.y = value.y;
 		},
-
-		pause() {
+		pause()
+		{
 			if (paused || gameOver) return;
 			if (['1-player', '2-player'].indexOf(gameManager.getMode()) === -1) return;
 
@@ -157,66 +178,70 @@ export default (game, gameManager) => {
 			gameManager.state = 'pause';
 			gameManager.openMenu('pause');
 		},
-
-		quitGame() {
+		quitGame()
+		{
 			gameOver = true;
 		
 			gameManager.gameOver(false);
-			gameManager.state = null;
 			gameManager.openMenu('main');
+			gameManager.state = null;
 		},
-
-		randomPiece() {
-			const piece = pieces[pieces.length * Math.random() | 0];
-			
-			return piece;
+		randomPiece()
+		{
+			return pieces[pieces.length * Math.random() | 0];			
 		},
-
-		reset(player) {
+		reset(player)
+		{
 			if (paused || gameOver) return;
 			
 			//New piece should be provided by server
 			newPiece()
-			.then(piece => {
+			.then(piece =>
+			{
 				player.matrix = piece;
 				pos.y = 0;
 				pos.x = (arena.matrix[0].length / 2 | 0) - (player.matrix[0].length / 2 | 0);
 				pieceCount++;
 
-				if (arena.collide(arena, player)) {
-					//Game over
-					onGameOver(player);
-				}
 				events.emit('pos', pos);
 				events.emit('matrix', player.matrix);
+
+				if (arena.collide(arena, player))
+					onGameOver(player);
 			})
-			.catch(e => {
+			.catch(e =>
+			{
 				//Game over
-				if (gameManager.isRunning()) {
+				if (gameManager.isRunning())
+				{
 					onGameOver(player);
 					gameManager.openMenu('error');
 				}
-			})
+			});
 		},
-
-		resume() {
+		resume()
+		{
 			if (!paused || gameOver) return;
 
 			paused = false;
 			gameManager.closeMenus();
 		},
-
-		rotate(player, dir) {
+		rotate(player, dir)
+		{
 			if (paused || gameOver) return;
 
-			const xAxis = pos.x;
-			let offset = 1;
+			const 	xAxis 	= pos.x;
+			let 	offset 	= 1;
 
 			player._rotateMatrix(player.matrix, dir);
-			while(arena.collide(arena, player)) {
+
+			while(arena.collide(arena, player))
+			{
 				pos.x += offset;
 				offset = -(offset + (offset > 0 ? 1 : -1));
-				if (offset > player.matrix[0].length) {
+				
+				if (offset > player.matrix[0].length)
+				{
 					player._rotateMatrix(player.matrix, -dir);
 					pos.x =  xAxis; 
 					return;
@@ -224,22 +249,19 @@ export default (game, gameManager) => {
 			}
 			events.emit('matrix', player.matrix);
 		},
-
-		_rotateMatrix(matrix, dir) {
+		_rotateMatrix(matrix, dir)
+		{
 			if (paused || gameOver) return;
 
-			for (let y = 0; y < matrix.length; ++y) {
-				for (let x = 0; x < y; ++x) {
-					//Swap values respectfully between first and last rows or columns
+			for (let y = 0; y < matrix.length; ++y)
+				for (let x = 0; x < y; ++x)
 					[
 						matrix[x][y],
 						matrix[y][x]
 					] = [
 						matrix[y][x],
 						matrix[x][y]
-					]
-				}
-			}
+					]; //Swap values respectfully between first and last rows or columns
 
 			if (dir > 0) {
 				matrix.forEach(row => row.reverse());
@@ -247,52 +269,57 @@ export default (game, gameManager) => {
 				matrix.reverse();
 			}
 		},
-
-		setName(value) {
+		setDropInterval(value)
+		{
+			dropInterval = value;
+		},
+		setName(value)
+		{
 			name = value;
 		},
-
-		setScore(value) {
+		setScore(value)
+		{
 			if (isNaN(value))
 				return;
 
 			score = parseInt(value);
 		},
-
-		slow() {
+		slow()
+		{
 			return slow;
 		},
-
-		update(player, deltaTime) {
+		update(player, deltaTime)
+		{
 			if (paused || gameOver) return;
 
 			dropCounter += deltaTime;
 
-			if (dropCounter > player.dropInterval) {
+			if (dropCounter > player.dropInterval)
 				player.drop(player);
-			}
 		},
-		
-
-		verticalAlign(player, dir=-1) {
+		verticalAlign(player, dir=-1)
+		{
 			if (paused || gameOver) return;
 
 			//Move to the side
-			if (DEV) {
+			if (DEV)
 				console.log('Aligning tetromino vertically');
-			}
-			const emit = false;
-			let tileAvailable = player.move(player, dir, emit);
 
-			if (tileAvailable) {
+			const emit 			= false;
+			const tileAvailable = player.move(player, dir, emit);
+
+			if (tileAvailable)
+			{
 				//Check tiles above and below
-				if (player.move(player, 1, 'y', emit)) {
+				if (player.move(player, 1, 'y', emit))
+				{
 					//There was no collision this isn't a hole
 					player.move(player, -1, 'y', emit);
 					player.move(player, dir * -1, emit);
 					return false;
 				}
-				if (player.move(player, -1, 'y', emit)) {
+				if (player.move(player, -1, 'y', emit))
+				{
 					player.move(player, 1, 'y', emit);
 					player.move(player, dir * -1, emit);
 					return false;
@@ -301,6 +328,5 @@ export default (game, gameManager) => {
 			}
 			return false;
 		}
-  
 	};
 }

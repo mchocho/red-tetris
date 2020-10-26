@@ -12,45 +12,41 @@ const DEV 						= process.env.DEV || false;
 const LOG_SESSIONS 				= process.env.SESSION || false;
 const sessions 					= new Map();
 
-const io = new WebSocketServer({port: PORT}, () => {
+const io 						= new WebSocketServer({port: PORT}, () =>
+{
 	console.log('Socket listening on port', PORT);
 });
 
-io.on('connection', conn => {
-	if (DEV) {
+io.on('connection', conn =>
+{
+	if (DEV)
 		console.log('Connection established');
-	}
+
 	const client =  new Player(conn, createId());
 
-	conn.on('message', (msg) => {
-		if (DEV) {
+	conn.on('message', msg =>
+	{
+		if (DEV)
 			console.log('Message receieved', msg);
-		}
+		
 		const data = JSON.parse(msg);
 
-		if (data.type === 'create-session') {
+		if (data.type === 'create-session')
 			client.createSession(createId(), sessions, data);
-		}
-		else if (data.type === 'join-session') {
+		else if (data.type === 'join-session')
 			client.joinSession(sessions, data);
-		}
-		else if (data.type === 'start-game') {
+		else if (data.type === 'start-game')
 			client.startGame(sessions, data);
-		}
-		else if (data.type === 'game-over') {
+		else if (data.type === 'game-over')
 			client.gameOver(sessions, data);
-		}
-		else if (data.type === 'new-piece') {
+		else if (data.type === 'new-piece')
 			client.pieces++;
-		}
-		else if (data.type === 'state-update') {
+		else if (data.type === 'state-update')
+		{
 			const [prop, value] = data.state;
 	
-			if (prop === 'sweep') {
-				//update score
-				if (DEV) {
-					console.log('Punish other players');
-				}
+			if (prop === 'sweep')
+			{
 				client.broadcast({ type: 'penalty' });
 				return;
 			}
@@ -60,43 +56,45 @@ io.on('connection', conn => {
 			client.broadcast(data);
 		}
 
-		if (sessions.has(client.session.id)) {
+		if (sessions.has(client.session.id))
+		{
 			const session = getSession(sessions, client.session.id);
 				
 			//Add new pieces if client reaches end of que in 5 drop
-			while ([...session.clients].some(client => client.pieces >= session.pieceLayout.length - QUE_LIMIT)) {
-				if (DEV)
-					console.log('Adding new piece');
+			while ([...session.clients].some(client => client.pieces >= session.pieceLayout.length - QUE_LIMIT))
 				session.addNewPiece();
-			}
+
 			session.broadcastSession();
 		}
 	});
 
 
-	conn.on('close', () => {
-		if (DEV) {
+	conn.on('close', () =>
+	{
+		if (DEV)
 			console.log(`${client.name} left the game`);
-			//console.log('Connection closed');
-		}
+
 		//When a connection is closed we want to leave the session
 		const session = client.session;
 
-		if (session) {
+		if (session)
+		{
 			session.leave(client);
 			session.broadcastSession();
 
 			const playersActive = [...session.clients].filter(client => client.isPlaying); 
 
-			if (session.clients.size === 0) {
-				if (DEV) {
+			if (session.clients.size === 0)
+			{
+				if (DEV)
 					console.log('Deleting session.');
-				}
+
 				//No one is in this session, we can delete the session
 				sessions.delete(session.id);
 				return;
 			}
-			else if (playersActive.length === 1) {
+			else if (playersActive.length === 1)
+			{
 				//There's only 1 player left in the current game announce them as winner
 				const player = playersActive[0];
 
@@ -104,10 +102,8 @@ io.on('connection', conn => {
 				player.send({ type: 'game-winner' });
 			}
 
-			if (session.owner === client.id) {
-				//The client who left is in charge of the session
+			if (session.owner === client.id)
 				session.getNewOwner(session);
-			}
 		}
 	});
 });
